@@ -1,0 +1,10 @@
+#!/bin/bash
+
+#/Users/reckbo/Documents/slicers/trunk/Slicer3-build/lib/Slicer3/Plugins/GroupWiseRegistration --resultsDirectory ./ --outputVolume_Warp masked_case00747.nii.gz --num_multires_levels 6 --num_outer_iterations 10 --num_inner_iterations 50 --initial_sigma_diff 10 --final_sigma_diff 2 --reg_weight 10 --useJacFlag 
+
+#/Users/reckbo/Documents/slicers/trunk/Slicer3-build/lib/Slicer3/Plugins/GroupWiseRegistration --volumeFileNames /Users/reckbo/Documents/slicers/trunk/Slicer3/Applications/CLI/GroupWiseRegistration/masked_case00747.nii.gz,/Users/reckbo/Documents/slicers/trunk/Slicer3/Applications/CLI/GroupWiseRegistration/masked_caseG119.nii.gz --resultsDirectory /Users/reckbo/Documents/slicers/trunk/Slicer3-build/Applications/CLI/GroupWiseRegistration --outputVolume_Warp masked_case00747.nii.gz --output_image output.nii.gz --num_multires_levels 6 --num_outer_iterations 10 --num_inner_iterations 50 --initial_sigma_diff 10 --final_sigma_diff 2 --reg_weight 10 --useJacFlag 
+
+./slicer/Slicer3-build/lib/Slicer3/Plugins/GroupWiseRegistration --volumeFileNames masked_case00747.nii.gz,masked_caseG119.nii.gz --resultsDirectory ./ --outputVolume_Warp masked_case00747.nii.gz --output_image output.nii.gz --num_multires_levels 6 --num_outer_iterations 10 --num_inner_iterations 50 --initial_sigma_diff 10 --final_sigma_diff 2 --reg_weight 10 --useJacFlag 
+
+#/Users/reckbo/Documents/slicers/trunk/Slicer3-build/lib/Slicer3/Plugins/GroupWiseRegistration --volumeFileNames /Users/reckbo/Documents/slicers/trunk/Slicer3/Applications/CLI/GroupWiseRegistration/masked_case00747.nii.gz,/Users/reckbo/Documents/slicers/trunk/Slicer3/Applications/CLI/GroupWiseRegistration/masked_caseG119.nii.gz --resultsDirectory /Users/reckbo/Documents/slicers/trunk/Slicer3-build/Applications/CLI/GroupWiseRegistration --outputVolume_Warp masked_case00747.nii.gz --output_image slicer:0x10e2a79e0#vtkMRMLScalarVolumeNode1 --num_multires_levels 6 --num_outer_iterations 10 --num_inner_iterations 50 --initial_sigma_diff 10 --final_sigma_diff 2 --reg_weight 10 --useJacFlag 
+
