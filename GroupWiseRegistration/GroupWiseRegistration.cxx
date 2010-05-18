@@ -40,7 +40,6 @@
 #include "itkDiscreteGaussianImageFilter.h"
 #include "itkImageFileReader.h"
 #include "itkImageFileWriter.h"
-#include "itkESMInvConDemonsRegistrationFunction.h"
 #include "GroupWiseRegistrationCLP.h"
 //from velocityfieldexp
 #include "itkExponentialDeformationFieldImageFilter.h"
@@ -54,9 +53,85 @@
 namespace 
 {
 
+struct arguments
+{
+   std::string  fixedImageFile;  /* -f option */
+   std::string  movingImageFile; /* -m option */
+   std::string  outputImageFile; /* -o option */
+   std::string  outputFieldFile; /* -O option */
+   std::string  trueFieldFile;   /* -r option */
+   unsigned int numLevels;       /* -n option */
+   std::vector<unsigned int> numIterations;   /* -i option */
+   float sigmaDef;               /* -s option */
+   float sigmaUp;                /* -g option */
+   float maxStepLength;          /* -l option */
+   bool useVanillaDem;           /* -a option */
+   unsigned int gradientType;    /* -t option */
+   bool useHistogramMatching;    /* -e option */
+   unsigned int verbosity;       /* -v option */
+
+   arguments () :
+    fixedImageFile(""),
+    movingImageFile(""),
+    outputImageFile("output.mha"),
+    outputFieldFile(""),
+    trueFieldFile(""),
+    numLevels(3u),
+    sigmaDef(3.0f),
+    sigmaUp(0.0f),
+    maxStepLength(2.0f),
+    useVanillaDem(false),
+    gradientType(0u),
+    useHistogramMatching(false),
+    verbosity(0u)
+   {
+      numIterations = std::vector<unsigned int>(numLevels, 10u);
+   }
+
+   friend std::ostream& operator<< (std::ostream& o, const arguments& args)
+   {
+    std::ostringstream osstr;
+    for (unsigned int i=0; i<args.numIterations.size(); ++i)
+       osstr<<args.numIterations[i]<<" ";
+    std::string iterstr = "[ " + osstr.str() + "]";
+
+    std::string gtypeStr;
+    switch (args.gradientType)
+    {
+    case 0:
+       gtypeStr = "symmetrized";
+       break;
+    case 1:
+       gtypeStr = "fixed image";
+       break;
+    case 2:
+       gtypeStr = "moving image";
+       break;
+    default:
+       gtypeStr = "unsuported";
+    }
+       
+    return o
+       <<"Arguments structure:"<<std::endl
+       <<"  Fixed image file: "<<args.fixedImageFile<<std::endl
+       <<"  Moving image file: "<<args.movingImageFile<<std::endl
+       <<"  Output image file: "<<args.outputImageFile<<std::endl
+       <<"  Output field file: "<<args.outputFieldFile<<std::endl
+       <<"  True field file: "<<args.trueFieldFile<<std::endl
+       <<"  Number of multiresolution levels: "<<args.numLevels<<std::endl
+       <<"  Number of demons iterations: "<<iterstr<<std::endl
+       <<"  Deformation field sigma: "<<args.sigmaDef<<std::endl
+       <<"  Update field sigma: "<<args.sigmaUp<<std::endl
+       <<"  Maximum update step length: "<<args.maxStepLength<<std::endl
+       <<"  Use vanilla demons: "<<args.useVanillaDem<<std::endl
+       <<"  Type of gradient: "<<gtypeStr<<std::endl
+       <<"  Use histogram matching: "<<args.useHistogramMatching<<std::endl
+       <<"  Verbosity: "<<args.verbosity;
+   }
+};
 
   template <unsigned int Dimension>
-  void DoGroupWiseRegistration( std::string p_arrVolumeNames[], std::string resultsDirectory, std::string outputVolume, bool useJacFlag )
+  void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], std::string resultsDirectory, std::string outputVolume, bool useJacFlag )
   {
 
   // Declare the types of the images
@@ -86,8 +161,8 @@ namespace
     }
 
   // Set up pyramids
-
-
+  
+  
   // Begin inconvforces
      typedef float                                        VectorComponentType;
      typedef itk::Vector<VectorComponentType, Dimension>  VectorPixelType;
@@ -188,6 +263,31 @@ namespace
      drfp->SetUseGradientType( gtype );
      drfp->SetRegWeight( 1.0 ); //drfp->SetRegWeight( regWeight );
 
+  // set up demons filter (not currently used)
+     typedef typename itk::DiffeomorphicDemonsRegistrationFilter < ImageType, ImageType, DeformationFieldType>   ActualRegistrationFilterType;
+     //typedef typename ActualRegistrationFilterType::GradientType GradientType;
+     typename ActualRegistrationFilterType::Pointer filter = ActualRegistrationFilterType::New();
+     //filter->SetMaximumUpdateStepLength( args.maxStepLength );
+     filter->SetMaximumUpdateStepLength( 1e1 ); //TODO: check this
+     //filter->SetUseGradientType( static_cast<GradientType>(args.gradientType) );
+     filter->SetUseGradientType( gtype );
+    if ( args.sigmaDef > 0.1 )
+       {
+          filter->SmoothDeformationFieldOn();
+          filter->SetStandardDeviations( args.sigmaDef );
+       }
+       else
+          filter->SmoothDeformationFieldOff();
+
+       if ( args.sigmaUp > 0.1 )
+       {
+          filter->SmoothUpdateFieldOn();
+          filter->SetUpdateFieldStandardDeviations( args.sigmaUp );
+       }
+       else
+          filter->SmoothUpdateFieldOff();
+
+
   // Run demons registration 
      int numIter = 1;
      int strike = 0;
@@ -216,27 +316,27 @@ namespace
        std::cout<<"Minimum of the determinant of the Jacobian of the warp: " <<minmaxfilter->GetMinimum()<<std::endl;
        std::cout<<"Maximum of the determinant of the Jacobian of the warp: " <<minmaxfilter->GetMaximum()<<std::endl;
 
-      /**Debug**/
-      /*try
-      {
-        typedef itk::ImageFileWriter< DeformationFieldType>  FieldWriterType;
-        typename FieldWriterType::Pointer      fieldwriter =  FieldWriterType::New();
-        fieldwriter->SetUseCompression( true );
-        fieldwriter->SetFileName( "field.nii.gz" );
-        fieldwriter->SetInput( field  );
-        fieldwriter->Update();
-        fieldwriter->SetFileName( "inv_field.nii.gz" );
-        fieldwriter->SetInput( inv_field );
-        fieldwriter->Update();
-      }
-      catch( itk::ExceptionObject& err )
-      {
-         std::cout << "Unexpected error." << std::endl;
-         std::cout << err << std::endl;
-         exit( EXIT_FAILURE );
-      }
-      exit(0);
-     /**End Debug**/
+      /*Debug*/
+      // try
+      // {
+      //   typedef itk::ImageFileWriter< DeformationFieldType>  FieldWriterType;
+      //   typename FieldWriterType::Pointer      fieldwriter =  FieldWriterType::New();
+      //   fieldwriter->SetUseCompression( true );
+      //   fieldwriter->SetFileName( "field.nii.gz" );
+      //   fieldwriter->SetInput( field  );
+      //   fieldwriter->Update();
+      //   fieldwriter->SetFileName( "inv_field.nii.gz" );
+      //   fieldwriter->SetInput( inv_field );
+      //   fieldwriter->Update();
+      // }
+      // catch( itk::ExceptionObject& err )
+      // {
+      //    std::cout << "Unexpected error." << std::endl;
+      //    std::cout << err << std::endl;
+      //    exit( EXIT_FAILURE );
+      // }
+      // exit(0);
+     /*End Debug*/
 
 
        /**Debug**/
@@ -460,11 +560,35 @@ int main( int argc, char * argv[] )
 
   std::string volumeNames[volumeFileNames.size()];
   for (unsigned int i = 0; i < volumeFileNames.size(); ++i)
-      {
-      volumeNames[i] = volumeFileNames[i].c_str();
-      }
+    {
+    volumeNames[i] = volumeFileNames[i].c_str();
+    }
 
-  DoGroupWiseRegistration<3>(volumeNames, resultsDirectory.c_str(), outputVolume.c_str(), useJacFlag);
+ // set up the args structure from the parsed input
+   arguments args;
+   // args.fixedImageFile = demonsTargetVolume;
+   // args.movingImageFile = demonsMovingVolume;
+   // args.outputImageFile = demonsResampledVolume;
+   // args.outputFieldFile = demonsDeformationVolume;
+   // args.numLevels = levels;
+   // if (iteration.size() > 0)
+   //   {
+   //   args.numIterations.clear();
+   //   }
+   // for (unsigned int i = 0; i < iteration.size(); i++)
+   //   {
+   //   args.numIterations.push_back(iteration[i]);
+   //   }
+   // args.sigmaDef = smoothing;
+   // args.sigmaUp = smoothingUp;
+   // args.maxStepLength = maxStepLength;
+   // args.useVanillaDem = turnOffDiffeomorph;
+   // args.gradientType = gradientType;
+   // args.useHistogramMatching = normalization;
+   // args.verbosity = verbose;
+
+
+  DoGroupWiseRegistration<3>(args, volumeNames, resultsDirectory.c_str(), outputVolume.c_str(), useJacFlag);
 
   return EXIT_SUCCESS;
 }

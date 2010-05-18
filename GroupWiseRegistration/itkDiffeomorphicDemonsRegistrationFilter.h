@@ -2,8 +2,7 @@
 #define _itkDiffeomorphicDemonsRegistrationFilter_h_
 
 #include "itkPDEDeformableRegistrationFilter.h"
-//#include "itkESMInvConDemonsRegistrationFunction.h"
-#include "itkESMnDemonsRegistrationFunction.h"
+#include "itkESMInvConDemonsRegistrationFunction.h"
 
 #include "itkMultiplyByConstantImageFilter.h"
 #include "itkExponentialDeformationFieldImageFilter.h"
@@ -99,7 +98,7 @@ public:
   // FIXME if not ESMDemons
   //typedef FastSymmetricForcesDemonsRegistrationFunction<FixedImageType,MovingImageType,
   //typedef SymmetricForcesDemonsRegistrationFunction<FixedImageType,MovingImageType,
-  typedef ESMDemonsRegistrationFunction<FixedImageType,MovingImageType, DeformationFieldType>  DemonsRegistrationFunctionType;
+  typedef ESMInvConDemonsRegistrationFunction<FixedImageType,MovingImageType, DeformationFieldType>  DemonsRegistrationFunctionType;
 
   /** Exp and composition typedefs */
   typedef MultiplyByConstantImageFilter<
