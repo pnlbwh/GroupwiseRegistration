@@ -5,5 +5,5 @@ if [ -z $dir ]; then
   mkdir $dir
 fi
 
-mv GroupWiseRegistration/*  $dir
+cp GroupWiseRegistration/*  $dir
 make -f slicer/Slicer3-build/Applications/CLI/GroupWiseRegistration/Makefile
