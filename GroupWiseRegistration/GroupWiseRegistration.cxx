@@ -25,7 +25,7 @@
 
 #include "itkOrientedImage.h"
 #include "itkOrientImageFilter.h"
-//#include "itkMultiResolutionPDEDeformableRegistration2.h"
+#include "itkMultiResolutionPDEDeformableRegistration2.h"
 #include "itkFastSymmetricForcesDemonsRegistrationFilter.h"
 #include "itkDiffeomorphicDemonsRegistrationFilter.h"
 #include "itkWarpImageFilter.h"
@@ -286,6 +286,41 @@ struct arguments
        }
        else
           filter->SmoothUpdateFieldOff();
+
+ // Set up the multi-resolution filter
+   typedef typename itk::MultiResolutionPDEDeformableRegistration2< ImageType, ImageType, DeformationFieldType, PixelType >   MultiResRegistrationFilterType;
+   typename MultiResRegistrationFilterType::Pointer multires = MultiResRegistrationFilterType::New();
+
+   multires->SetRegistrationFilter( filter );
+   multires->SetNumberOfLevels( args.numLevels );
+   
+   multires->SetNumberOfIterations( &args.numIterations[0] );
+
+   multires->SetFixedImage( fixedimage );
+   multires->SetMovingImage( movingimage );
+
+
+   // if ( args.verbosity > 0 )
+   // {
+   //    // Create the Command observer and register it with the registration filter.
+   //    typename CommandIterationUpdate<PixelType, Dimension>::Pointer multiresobserver = CommandIterationUpdate<PixelType, Dimension>::New();
+   //    multires->AddObserver( itk::IterationEvent(), multiresobserver );
+   // }
+   
+
+   
+   //Compute the deformation field
+   try
+   {
+      multires->UpdateLargestPossibleRegion();
+   }
+   catch( itk::ExceptionObject& err )
+   {
+      std::cout << "Unexpected error." << std::endl;
+      std::cout << err << std::endl;
+      exit( EXIT_FAILURE );
+   }
+
 
 
   // Run demons registration 
