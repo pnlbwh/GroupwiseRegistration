@@ -1,0 +1,6 @@
+[submodule "slicer3-6/Slicer3"]
+	path = slicer3-6/Slicer3
+	url = reckbo@pnl-t55-9:/spl_unsupported/pnlfs/reckbo/slicer3-6/Slicer3
+[submodule "10_masked_cases_affined"]
+	path = 10_masked_cases_affined
+	url = pnl-t55-9:/spl_unsupported/pnlfs/reckbo/10_masked_cases_affined.git
