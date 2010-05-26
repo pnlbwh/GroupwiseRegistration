@@ -55,79 +55,87 @@ namespace
 
 struct arguments
 {
-   std::string  fixedImageFile;  /* -f option */
-   std::string  movingImageFile; /* -m option */
-   std::string  outputImageFile; /* -o option */
-   std::string  outputFieldFile; /* -O option */
-   std::string  trueFieldFile;   /* -r option */
-   unsigned int numLevels;       /* -n option */
-   std::vector<unsigned int> numIterations;   /* -i option */
-   float sigmaDef;               /* -s option */
-   float sigmaUp;                /* -g option */
-   float maxStepLength;          /* -l option */
-   bool useVanillaDem;           /* -a option */
-   unsigned int gradientType;    /* -t option */
-   bool useHistogramMatching;    /* -e option */
-   unsigned int verbosity;       /* -v option */
+   std::string outputImageFile;
+   unsigned int numLevels;
+   unsigned int numIterations;
+   std::vector<std::string> volumeFileNames;   
+   std::string resultsDirectory;
+   unsigned int numOuterIterations;
+   float initialSigmaDiff;
+   float finalSigmaDiff;
+   float regWeight;
+   bool useJac;
+   float sigmaDef;        
+   float sigmaUp;          
+   float maxStepLength;     
+   // unsigned int gradientType;
+
+   // std::string  fixedImageFile;  /* -f option */
+   // std::string  movingImageFile; /* -m option */
+   // std::string  outputFieldFile; /* -O option */
+   // std::string  trueFieldFile;   /* -r option */
+   // std::vector<unsigned int> numIterations;   /* -i option */
+   // bool useVanillaDem;           /* -a option */
+   // bool useHistogramMatching;    /* -e option */
+   // unsigned int verbosity;       /* -v option */
 
    arguments () :
-    fixedImageFile(""),
-    movingImageFile(""),
-    outputImageFile("output.mha"),
-    outputFieldFile(""),
-    trueFieldFile(""),
-    numLevels(3u),
-    sigmaDef(3.0f),
-    sigmaUp(0.0f),
-    maxStepLength(2.0f),
-    useVanillaDem(false),
-    gradientType(0u),
-    useHistogramMatching(false),
-    verbosity(0u)
+     numLevels(6u),
+     numIterations(50u),
+     resultsDirectory("./"),
+     numOuterIterations(50),
+     initialSigmaDiff(10),
+     finalSigmaDiff(2),
+     regWeight(1e1),
+     useJac(true),
+     outputImageFile("output.nii.gz"),
+     sigmaDef(3.0f),
+     sigmaUp(0.0f),
+     maxStepLength(2.0f)
    {
-      numIterations = std::vector<unsigned int>(numLevels, 10u);
+     volumeFileNames = std::vector<std::string>(1, "");
    }
 
-   friend std::ostream& operator<< (std::ostream& o, const arguments& args)
-   {
-    std::ostringstream osstr;
-    for (unsigned int i=0; i<args.numIterations.size(); ++i)
-       osstr<<args.numIterations[i]<<" ";
-    std::string iterstr = "[ " + osstr.str() + "]";
+   // friend std::ostream& operator<< (std::ostream& o, const arguments& args)
+   // {
+    // std::ostringstream osstr;
+    // for (unsigned int i=0; i<args.numIterations.size(); ++i)
+    //    osstr<<args.numIterations[i]<<" ";
+    // std::string iterstr = "[ " + osstr.str() + "]";
 
-    std::string gtypeStr;
-    switch (args.gradientType)
-    {
-    case 0:
-       gtypeStr = "symmetrized";
-       break;
-    case 1:
-       gtypeStr = "fixed image";
-       break;
-    case 2:
-       gtypeStr = "moving image";
-       break;
-    default:
-       gtypeStr = "unsuported";
-    }
+    // std::string gtypeStr;
+    // switch (args.gradientType)
+    // {
+    // case 0:
+    //    gtypeStr = "symmetrized";
+    //    break;
+    // case 1:
+    //    gtypeStr = "fixed image";
+    //    break;
+    // case 2:
+    //    gtypeStr = "moving image";
+    //    break;
+    // default:
+    //    gtypeStr = "unsuported";
+    // }
        
-    return o
-       <<"Arguments structure:"<<std::endl
-       <<"  Fixed image file: "<<args.fixedImageFile<<std::endl
-       <<"  Moving image file: "<<args.movingImageFile<<std::endl
-       <<"  Output image file: "<<args.outputImageFile<<std::endl
-       <<"  Output field file: "<<args.outputFieldFile<<std::endl
-       <<"  True field file: "<<args.trueFieldFile<<std::endl
-       <<"  Number of multiresolution levels: "<<args.numLevels<<std::endl
-       <<"  Number of demons iterations: "<<iterstr<<std::endl
-       <<"  Deformation field sigma: "<<args.sigmaDef<<std::endl
-       <<"  Update field sigma: "<<args.sigmaUp<<std::endl
-       <<"  Maximum update step length: "<<args.maxStepLength<<std::endl
-       <<"  Use vanilla demons: "<<args.useVanillaDem<<std::endl
-       <<"  Type of gradient: "<<gtypeStr<<std::endl
-       <<"  Use histogram matching: "<<args.useHistogramMatching<<std::endl
-       <<"  Verbosity: "<<args.verbosity;
-   }
+    // return o
+    //    <<"Arguments structure:"<<std::endl
+    //    <<"  Fixed image file: "<<args.fixedImageFile<<std::endl
+    //    <<"  Moving image file: "<<args.movingImageFile<<std::endl
+    //    <<"  Output image file: "<<args.outputImageFile<<std::endl
+    //    <<"  Output field file: "<<args.outputFieldFile<<std::endl
+    //    <<"  True field file: "<<args.trueFieldFile<<std::endl
+    //    <<"  Number of multiresolution levels: "<<args.numLevels<<std::endl
+    //    <<"  Number of demons iterations: "<<args.numIterations<<std::endl //<<"  Number of demons iterations: "<<iterstr<<std::endl
+    //    <<"  Deformation field sigma: "<<args.sigmaDef<<std::endl
+    //    <<"  Update field sigma: "<<args.sigmaUp<<std::endl
+    //    <<"  Maximum update step length: "<<args.maxStepLength<<std::endl
+    //    <<"  Use vanilla demons: "<<args.useVanillaDem<<std::endl
+    //    <<"  Type of gradient: "<<gtypeStr<<std::endl
+    //    <<"  Use histogram matching: "<<args.useHistogramMatching<<std::endl
+    //    <<"  Verbosity: "<<args.verbosity;
+   // }
 };
 
   template <unsigned int Dimension>
@@ -258,10 +266,11 @@ struct arguments
     //   std::cout<<"Maximum of the determinant of the Jacobian of the warp: " <<minmaxfilter->GetMaximum()<<std::endl;
     // }
 
+  // Set up demons registration function
      typename DemonsRegistrationFunctionType::Pointer drfp = DemonsRegistrationFunctionType::New();
      typename DemonsRegistrationFunctionType::GradientType gtype = DemonsRegistrationFunctionType::Symmetric;
      drfp->SetUseGradientType( gtype );
-     drfp->SetRegWeight( 1.0 ); //drfp->SetRegWeight( regWeight );
+     drfp->SetRegWeight( args.regWeight );
 
   // set up demons filter (not currently used)
      typedef typename itk::DiffeomorphicDemonsRegistrationFilter < ImageType, ImageType, DeformationFieldType>   ActualRegistrationFilterType;
@@ -273,8 +282,8 @@ struct arguments
      filter->SetUseGradientType( gtype );
     if ( args.sigmaDef > 0.1 )
        {
-          filter->SmoothDeformationFieldOn();
-          filter->SetStandardDeviations( args.sigmaDef );
+         filter->SmoothDeformationFieldOn();
+         filter->SetStandardDeviations( args.sigmaDef );
        }
        else
           filter->SmoothDeformationFieldOff();
@@ -288,24 +297,25 @@ struct arguments
           filter->SmoothUpdateFieldOff();
 
  // Set up the multi-resolution filter
-   typedef typename itk::MultiResolutionPDEDeformableRegistration2< ImageType, ImageType, DeformationFieldType, PixelType >   MultiResRegistrationFilterType;
-   typename MultiResRegistrationFilterType::Pointer multires = MultiResRegistrationFilterType::New();
+     typedef typename itk::MultiResolutionPDEDeformableRegistration2< ImageType, ImageType, DeformationFieldType, PixelType >   MultiResRegistrationFilterType;
+     typename MultiResRegistrationFilterType::Pointer multires = MultiResRegistrationFilterType::New();
 
-   multires->SetRegistrationFilter( filter );
-   multires->SetNumberOfLevels( args.numLevels );
-   
-   multires->SetNumberOfIterations( &args.numIterations[0] );
+     multires->SetRegistrationFilter( filter );
+     multires->SetNumberOfLevels( args.numLevels );
+     
+     // multires->SetNumberOfIterations( &args.numIterations[0] );
+     multires->SetNumberOfIterations( &args.numIterations );
 
-   multires->SetFixedImage( fixedimage );
-   multires->SetMovingImage( movingimage );
+     multires->SetFixedImage( fixedimage );
+     multires->SetMovingImage( movingimage );
 
 
-   // if ( args.verbosity > 0 )
-   // {
-   //    // Create the Command observer and register it with the registration filter.
-   //    typename CommandIterationUpdate<PixelType, Dimension>::Pointer multiresobserver = CommandIterationUpdate<PixelType, Dimension>::New();
-   //    multires->AddObserver( itk::IterationEvent(), multiresobserver );
-   // }
+     // if ( args.verbosity > 0 )
+     // {
+     //    // Create the Command observer and register it with the registration filter.
+     //    typename CommandIterationUpdate<PixelType, Dimension>::Pointer multiresobserver = CommandIterationUpdate<PixelType, Dimension>::New();
+     //    multires->AddObserver( itk::IterationEvent(), multiresobserver );
+     // }
    
 
    
@@ -605,7 +615,6 @@ int main( int argc, char * argv[] )
    // args.movingImageFile = demonsMovingVolume;
    // args.outputImageFile = demonsResampledVolume;
    // args.outputFieldFile = demonsDeformationVolume;
-   // args.numLevels = levels;
    // if (iteration.size() > 0)
    //   {
    //   args.numIterations.clear();
@@ -621,7 +630,16 @@ int main( int argc, char * argv[] )
    // args.gradientType = gradientType;
    // args.useHistogramMatching = normalization;
    // args.verbosity = verbose;
-
+   args.outputImageFile = outputVolume;
+   args.numLevels = numMultiresLevels;
+   args.numIterations = numInnerIterations;
+   args.volumeFileNames = volumeFileNames;
+   args.resultsDirectory = resultsDirectory;
+   args.numOuterIterations = numOuterIterations;
+   args.initialSigmaDiff = initialSigmaDiff;
+   args.finalSigmaDiff = finalSigmaDiff;
+   args.regWeight = regWeight;
+   args.useJac = useJacFlag;
 
   DoGroupWiseRegistration<3>(args, volumeNames, resultsDirectory.c_str(), outputVolume.c_str(), useJacFlag);
 

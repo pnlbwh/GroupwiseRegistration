@@ -54,6 +54,7 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
     }
 
   f->SetDeformationField( this->GetDeformationField() );
+  f->SetInvDeformationField( this->GetDeformationField() );
 
   // call the superclass  implementation ( initializes f )
   Superclass::InitializeIteration();
