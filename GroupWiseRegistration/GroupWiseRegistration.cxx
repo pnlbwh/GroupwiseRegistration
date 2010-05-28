@@ -557,7 +557,7 @@ protected:
      drfp->SetUseGradientType( gtype );
      drfp->SetRegWeight( args.regWeight );
 
-  // set up demons filter (not currently used)
+  // set up demons filter 
      typedef typename itk::DiffeomorphicDemonsRegistrationFilter < ImageType, ImageType, DeformationFieldType>   ActualRegistrationFilterType;
      //typedef typename ActualRegistrationFilterType::GradientType GradientType;
      typename ActualRegistrationFilterType::Pointer filter = ActualRegistrationFilterType::New();
@@ -669,8 +669,8 @@ protected:
        exponentiatorOfLogField->UpdateLargestPossibleRegion();
        field = exponentiatorOfLogField->GetOutput();
 
-       exponentiatorOfNegativeLogField->SetInput( log_field ); //TODO: convert to negative of log_field
-       exponentiatorOfNegativeLogField->UpdateLargestPossibleRegion();
+       // exponentiatorOfNegativeLogField->SetInput( log_field ); //TODO: convert to negative of log_field
+       // exponentiatorOfNegativeLogField->UpdateLargestPossibleRegion();
        m_Multiplier->SetInput( log_field );
        //m_Multiplier->GraftOutput( update ); //debugging
        m_Multiplier->Update();
