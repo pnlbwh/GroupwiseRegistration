@@ -30,24 +30,23 @@
 #include "itkDiffeomorphicDemonsRegistrationFilter.h"
 #include "itkWarpImageFilter.h"
 #include "itkCommand.h"
-//#include "itkWarpJacobianDeterminantFilter.h"
-#include <itkDisplacementFieldJacobianDeterminantFilter.h>
+#include "itkWarpJacobianDeterminantFilter.h"
 #include "itkMinimumMaximumImageCalculator.h"
-//#include "itkWarpSmoothnessCalculator.h"
-#include "itkMultiplyByConstantImageFilter.h"
+#include "itkWarpSmoothnessCalculator.h"
+#include "itkWarpJacobianDeterminantFilter.h"
 #include "itkGridForwardWarpImageFilter.h"
 #include "itkVectorCentralDifferenceImageFunction.h"
+
+#include <itkDisplacementFieldJacobianDeterminantFilter.h>
+#include "itkMultiplyByConstantImageFilter.h"
 #include "itkDiscreteGaussianImageFilter.h"
 #include "itkImageFileReader.h"
 #include "itkImageFileWriter.h"
 #include "GroupWiseRegistrationCLP.h"
-//from velocityfieldexp
+
 #include "itkExponentialDeformationFieldImageFilter.h"
-//from invcondemonsforces
 #include "itkESMInvConDemonsRegistrationFunction.h"
 #include <itkNeighborhoodAlgorithm.h>
-//from mex_warpimage
-#include <itkWarpImageFilter.h>
 #include "itkSmoothingRecursiveGaussianImageFilter.h"
 
 namespace 
@@ -68,6 +67,7 @@ struct arguments
    float sigmaDef;        
    float sigmaUp;          
    float maxStepLength;     
+   unsigned int verbosity;
    // unsigned int gradientType;
 
    // std::string  fixedImageFile;  /* -f option */
@@ -77,7 +77,6 @@ struct arguments
    // std::vector<unsigned int> numIterations;   /* -i option */
    // bool useVanillaDem;           /* -a option */
    // bool useHistogramMatching;    /* -e option */
-   // unsigned int verbosity;       /* -v option */
 
    arguments () :
      numLevels(6u),
@@ -91,7 +90,8 @@ struct arguments
      outputImageFile("output.nii.gz"),
      sigmaDef(3.0f),
      sigmaUp(0.0f),
-     maxStepLength(2.0f)
+     maxStepLength(2.0f),
+     verbosity(true)
    {
      volumeFileNames = std::vector<std::string>(1, "");
    }
@@ -137,6 +137,296 @@ struct arguments
     //    <<"  Verbosity: "<<args.verbosity;
    // }
 };
+
+//  The following section of code implements a Command observer
+//  that will monitor the evolution of the registration process.
+//
+template <class TPixel=float, unsigned int VImageDimension=3>
+class CommandIterationUpdate : public itk::Command 
+{
+public:
+   typedef  CommandIterationUpdate   Self;
+   typedef  itk::Command             Superclass;
+   typedef  itk::SmartPointer<Self>  Pointer;
+
+   typedef itk::Image< TPixel, VImageDimension > InternalImageType;
+   typedef itk::Vector< TPixel, VImageDimension >    VectorPixelType;
+   typedef itk::Image<  VectorPixelType, VImageDimension > DeformationFieldType;
+
+   typedef itk::DiffeomorphicDemonsRegistrationFilter<
+      InternalImageType,
+      InternalImageType,
+      DeformationFieldType>   DiffeomorphicDemonsRegistrationFilterType;
+
+   // typedef itk::FastSymmetricForcesDemonsRegistrationFilter<
+   //    InternalImageType,
+   //    InternalImageType,
+   //    DeformationFieldType>   FastSymmetricForcesDemonsRegistrationFilterType;
+
+   typedef itk::MultiResolutionPDEDeformableRegistration2<
+      InternalImageType, InternalImageType,
+      DeformationFieldType, TPixel >   MultiResRegistrationFilterType;
+
+   typedef itk::WarpJacobianDeterminantFilter<DeformationFieldType, InternalImageType> JacobianFilterType;
+   
+   typedef itk::MinimumMaximumImageCalculator<InternalImageType> MinMaxFilterType;
+
+   typedef itk::WarpSmoothnessCalculator<DeformationFieldType>
+      SmoothnessCalculatorType;
+
+   typedef itk::VectorCentralDifferenceImageFunction<DeformationFieldType>
+      WarpGradientCalculatorType;
+
+   typedef typename WarpGradientCalculatorType::OutputType WarpGradientType;
+   
+   itkNewMacro( Self );
+
+private:
+   std::ofstream m_Fid;
+   bool m_headerwritten;
+   typename JacobianFilterType::Pointer m_JacobianFilter;
+   typename MinMaxFilterType::Pointer m_Minmaxfilter;
+   typename SmoothnessCalculatorType::Pointer m_SmothnessCalculator;
+   typename DeformationFieldType::ConstPointer m_TrueField;
+   typename WarpGradientCalculatorType::Pointer m_TrueWarpGradientCalculator;
+   typename WarpGradientCalculatorType::Pointer m_CompWarpGradientCalculator;
+
+public:
+   void SetTrueField(const DeformationFieldType * truefield)
+   {
+      m_TrueField = truefield;
+
+      m_TrueWarpGradientCalculator = WarpGradientCalculatorType::New();
+      m_TrueWarpGradientCalculator->SetInputImage( m_TrueField );
+
+      m_CompWarpGradientCalculator =  WarpGradientCalculatorType::New();
+   }
+   
+   void Execute(itk::Object *caller, const itk::EventObject & event)
+   {
+      Execute( (const itk::Object *)caller, event);
+   }
+
+   void Execute(const itk::Object * object, const itk::EventObject & event)
+   {
+      if( !(itk::IterationEvent().CheckEvent( &event )) )
+      {
+         return;
+      }
+
+      typename DeformationFieldType::ConstPointer deffield = 0;
+      unsigned int iter = -1;
+      double metricbefore = -1.0;
+      
+      if ( const DiffeomorphicDemonsRegistrationFilterType * filter1 = 
+           dynamic_cast< const DiffeomorphicDemonsRegistrationFilterType * >( object ) )
+      {
+         iter = filter1->GetElapsedIterations() - 1;
+         metricbefore = filter1->GetMetric();
+         deffield = const_cast<DiffeomorphicDemonsRegistrationFilterType *>
+            (filter1)->GetDeformationField();
+      }
+      // else if ( const FastSymmetricForcesDemonsRegistrationFilterType * filter2 = 
+      //      dynamic_cast< const FastSymmetricForcesDemonsRegistrationFilterType * >( object ) )
+      // {
+      //    iter = filter2->GetElapsedIterations() - 1;
+      //    metricbefore = filter2->GetMetric();
+      //    deffield = const_cast<FastSymmetricForcesDemonsRegistrationFilterType *>
+      //       (filter2)->GetDeformationField();
+      // }
+      else if ( const MultiResRegistrationFilterType * multiresfilter = 
+           dynamic_cast< const MultiResRegistrationFilterType * >( object ) )
+      {
+         std::cout<<"Finished Multi-resolution iteration :"<<multiresfilter->GetCurrentLevel()-1<<std::endl;
+         std::cout<<"=============================="<<std::endl<<std::endl;
+      }
+      else
+      {
+         return;
+      }
+
+      if (deffield)
+      {
+         std::cout<<iter<<": MSE "<<metricbefore<<" - ";
+
+         double fieldDist = -1.0;
+         double fieldGradDist = -1.0;
+         double tmp;
+         if (m_TrueField)
+         {
+            typedef itk::ImageRegionConstIteratorWithIndex<DeformationFieldType>
+               FieldIteratorType;
+            FieldIteratorType currIter(
+               deffield, deffield->GetLargestPossibleRegion() );
+            FieldIteratorType trueIter(
+               m_TrueField, deffield->GetLargestPossibleRegion() );
+
+            m_CompWarpGradientCalculator->SetInputImage( deffield );
+
+            fieldDist = 0.0;
+            fieldGradDist = 0.0;
+            for ( currIter.GoToBegin(), trueIter.GoToBegin();
+                  !currIter.IsAtEnd(); ++currIter, ++trueIter )
+            {
+               fieldDist += (currIter.Value() - trueIter.Value()).GetSquaredNorm();
+
+               // No need to add Id matrix here as we do a substraction
+               tmp = (
+                  ( m_CompWarpGradientCalculator->EvaluateAtIndex(currIter.GetIndex())
+                    -m_TrueWarpGradientCalculator->EvaluateAtIndex(trueIter.GetIndex())
+                     ).GetVnlMatrix() ).frobenius_norm();
+               fieldGradDist += tmp*tmp;
+            }
+            fieldDist = sqrt( fieldDist/ (double)(
+                     deffield->GetLargestPossibleRegion().GetNumberOfPixels()) );
+            fieldGradDist = sqrt( fieldGradDist/ (double)(
+                     deffield->GetLargestPossibleRegion().GetNumberOfPixels()) );
+            
+            std::cout<<"d(.,true) "<<fieldDist<<" - ";
+            std::cout<<"d(.,Jac(true)) "<<fieldGradDist<<" - ";
+         }
+         
+         m_SmothnessCalculator->SetImage( deffield );
+         m_SmothnessCalculator->Compute();
+         const double harmonicEnergy = m_SmothnessCalculator->GetSmoothness();
+         std::cout<<"harmo. "<<harmonicEnergy<<" - ";
+
+         
+         m_JacobianFilter->SetInput( deffield );
+         m_JacobianFilter->UpdateLargestPossibleRegion();
+
+        
+         const unsigned int numPix = m_JacobianFilter->
+            GetOutput()->GetLargestPossibleRegion().GetNumberOfPixels();
+         
+         TPixel* pix_start = m_JacobianFilter->GetOutput()->GetBufferPointer();
+         TPixel* pix_end = pix_start + numPix;
+
+         TPixel* jac_ptr;
+
+         // Get percentage of det(Jac) below 0
+         unsigned int jacBelowZero(0u);
+         for (jac_ptr=pix_start; jac_ptr!=pix_end; ++jac_ptr)
+         {
+            if ( *jac_ptr<=0.0 ) ++jacBelowZero;
+         }
+         const double jacBelowZeroPrc = static_cast<double>(jacBelowZero)
+            / static_cast<double>(numPix);
+         
+
+         // Get min an max jac
+         /*
+         std::pair<TPixel*, TPixel*> minmax_res =
+            boost::minmax_element(pix_start, pix_end);
+         */
+
+         //const double minJac = *(minmax_res.first);
+         //const double maxJac = *(minmax_res.second);
+
+         const double minJac = *(std::min_element (pix_start, pix_end));
+         const double maxJac = *(std::max_element (pix_start, pix_end));
+
+         // Get some quantiles
+         // We don't need the jacobian image
+         // we can modify/sort it in place
+         jac_ptr = pix_start + static_cast<unsigned int>(0.002*numPix);
+         std::nth_element(pix_start, jac_ptr, pix_end);
+         const double Q002 = *jac_ptr;
+
+         jac_ptr = pix_start + static_cast<unsigned int>(0.01*numPix);
+         std::nth_element(pix_start, jac_ptr, pix_end);
+         const double Q01 = *jac_ptr;
+
+         jac_ptr = pix_start + static_cast<unsigned int>(0.99*numPix);
+         std::nth_element(pix_start, jac_ptr, pix_end);
+         const double Q99 = *jac_ptr;
+
+         jac_ptr = pix_start + static_cast<unsigned int>(0.998*numPix);
+         std::nth_element(pix_start, jac_ptr, pix_end);
+         const double Q998 = *jac_ptr;
+         
+
+         std::cout<<"max|Jac| "<<maxJac<<" - "
+                  <<"min|Jac| "<<minJac<<" - "
+                  <<"ratio(|Jac|<=0) "<<jacBelowZeroPrc<<std::endl;
+         
+         
+
+         if (this->m_Fid.is_open())
+         {
+            if (!m_headerwritten)
+            {
+               this->m_Fid<<"Iteration"
+                          <<", MSE before"
+                          <<", Harmonic energy"
+                          <<", min|Jac|"
+                          <<", 0.2% |Jac|"
+                          <<", 01% |Jac|"
+                          <<", 99% |Jac|"
+                          <<", 99.8% |Jac|"
+                          <<", max|Jac|"
+                          <<", ratio(|Jac|<=0)";
+               
+               if (m_TrueField)
+               {
+                  this->m_Fid<<", dist(warp,true warp)"
+                             <<", dist(Jac,true Jac)";
+               }
+               
+               this->m_Fid<<std::endl;
+               
+               m_headerwritten = true;
+            }
+            
+            this->m_Fid<<iter
+                       <<", "<<metricbefore
+                       <<", "<<harmonicEnergy
+                       <<", "<<minJac
+                       <<", "<<Q002
+                       <<", "<<Q01
+                       <<", "<<Q99
+                       <<", "<<Q998
+                       <<", "<<maxJac
+                       <<", "<<jacBelowZeroPrc;
+
+            if (m_TrueField)
+            {
+               this->m_Fid<<", "<<fieldDist
+                          <<", "<<fieldGradDist;
+            }
+            
+            this->m_Fid<<std::endl;
+         }
+      }
+   }
+   
+protected:   
+     
+   // Kilian : Do not currently write results back to file  
+   //  m_Fid( "metricvalues.csv" ),
+
+   CommandIterationUpdate() :
+      m_headerwritten(false)
+   {
+      m_JacobianFilter = JacobianFilterType::New();
+      m_JacobianFilter->SetUseImageSpacing( true );
+      m_JacobianFilter->ReleaseDataFlagOn();
+      
+      m_Minmaxfilter = MinMaxFilterType::New();
+
+      m_SmothnessCalculator = SmoothnessCalculatorType::New();
+
+      m_TrueField = 0;
+      m_TrueWarpGradientCalculator = 0;
+      m_CompWarpGradientCalculator = 0;
+   };
+
+   ~CommandIterationUpdate()
+   {
+      this->m_Fid.close();
+   }
+};
+
 
   template <unsigned int Dimension>
   void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], std::string resultsDirectory, std::string outputVolume, bool useJacFlag )
@@ -244,11 +534,6 @@ struct arguments
      typedef typename MultiplyByConstantType::Pointer   MultiplyByConstantPointer;
      MultiplyByConstantPointer m_Multiplier = MultiplyByConstantType::New();
      m_Multiplier->SetConstant( -1 );
-     //m_Multiplier->SetInput( log_field );
-     //m_Multiplier->GraftOutput( log_field );
-     //m_Multiplier->Update();
-     //exponentiatorOfNegativeLogField->SetInput( m_Multiplier->GetOutput() ); //TODO: check this is negative of log_field
-     //exponentiatorOfNegativeLogField->UpdateLargestPossibleRegion();
 
   // Compute jacobian determinant
      typename JacobianDeterminantFilterType::Pointer jacdetfilter = JacobianDeterminantFilterType::New();
@@ -296,30 +581,27 @@ struct arguments
        else
           filter->SmoothUpdateFieldOff();
 
+       if ( args.verbosity > 0 )
+       {      
+         typename CommandIterationUpdate<PixelType, Dimension>::Pointer observer = CommandIterationUpdate<PixelType, Dimension>::New();
+         filter->AddObserver( itk::IterationEvent(), observer );
+       }
+
  // Set up the multi-resolution filter
      typedef typename itk::MultiResolutionPDEDeformableRegistration2< ImageType, ImageType, DeformationFieldType, PixelType >   MultiResRegistrationFilterType;
      typename MultiResRegistrationFilterType::Pointer multires = MultiResRegistrationFilterType::New();
-
      multires->SetRegistrationFilter( filter );
      multires->SetNumberOfLevels( args.numLevels );
-     
-     // multires->SetNumberOfIterations( &args.numIterations[0] );
-     multires->SetNumberOfIterations( &args.numIterations );
-
+     multires->SetNumberOfIterations( &args.numIterations ); // multires->SetNumberOfIterations( &args.numIterations[0] );
      multires->SetFixedImage( fixedimage );
      multires->SetMovingImage( movingimage );
+     if ( args.verbosity > 0 )
+     {
+       typename CommandIterationUpdate<PixelType, Dimension>::Pointer multiresobserver = CommandIterationUpdate<PixelType, Dimension>::New();
+       multires->AddObserver( itk::IterationEvent(), multiresobserver );
+     }
 
-
-     // if ( args.verbosity > 0 )
-     // {
-     //    // Create the Command observer and register it with the registration filter.
-     //    typename CommandIterationUpdate<PixelType, Dimension>::Pointer multiresobserver = CommandIterationUpdate<PixelType, Dimension>::New();
-     //    multires->AddObserver( itk::IterationEvent(), multiresobserver );
-     // }
-   
-
-   
-   //Compute the deformation field
+ //Compute the deformation field
    try
    {
       multires->UpdateLargestPossibleRegion();
@@ -331,6 +613,48 @@ struct arguments
       exit( EXIT_FAILURE );
    }
 
+ // The outputs
+   typename DeformationFieldType::Pointer defField = 0;
+   defField = multires->GetOutput();
+   defField->DisconnectPipeline();
+
+   //}//end for mem allocations
+
+   
+   // warp the result
+   typedef itk::WarpImageFilter < ImageType, ImageType, DeformationFieldType >  WarperType;
+   warper->SetInput( movingimage );
+       warper->SetInput( movingImageReader->GetOutput() );
+       warper->SetOutputSpacing( spacing );
+       warper->SetOutputOrigin( origin );
+   // warper->SetOutputSpacing( fixedimage->GetSpacing() );
+   // warper->SetOutputOrigin( fixedimage->GetOrigin() );
+   warper->SetDeformationField( defField );
+   
+   // Write warped image out to file
+   typedef PixelType OutputPixelType;
+   typedef itk::Image< OutputPixelType, Dimension > OutputImageType;
+   typedef itk::CastImageFilter < ImageType, OutputImageType > CastFilterType;
+   typedef itk::ImageFileWriter< OutputImageType >  WriterType;
+   
+   typename WriterType::Pointer      writer =  WriterType::New();
+   typename CastFilterType::Pointer  caster =  CastFilterType::New();
+   writer->SetFileName( args.outputImageFile.c_str() );
+   caster->SetInput( warper->GetOutput() );
+   writer->SetInput( caster->GetOutput()   );
+   writer->SetUseCompression( true );
+   try
+   {
+      writer->Update();
+   }
+   catch( itk::ExceptionObject& err )
+   {
+      std::cout << "Unexpected error." << std::endl;
+      std::cout << err << std::endl;
+      exit( EXIT_FAILURE );
+   }
+
+   exit(0);
 
 
   // Run demons registration 
@@ -560,8 +884,8 @@ struct arguments
      //end for options.numiter
      
   // Write image
-     typedef itk::ImageFileWriter< ImageType >  WriterType;
-    typename WriterType::Pointer      writer =  WriterType::New();
+     // typedef itk::ImageFileWriter< ImageType >  WriterType;
+    // typename WriterType::Pointer      writer =  WriterType::New();
     writer->SetFileName( outputVolume );
     //writer->SetInput( movingImageReader->GetOutput()  );
     writer->SetInput( warper->GetOutput()  );
