@@ -254,12 +254,9 @@ public:
          double tmp;
          if (m_TrueField)
          {
-            typedef itk::ImageRegionConstIteratorWithIndex<DeformationFieldType>
-               FieldIteratorType;
-            FieldIteratorType currIter(
-               deffield, deffield->GetLargestPossibleRegion() );
-            FieldIteratorType trueIter(
-               m_TrueField, deffield->GetLargestPossibleRegion() );
+            typedef itk::ImageRegionConstIteratorWithIndex<DeformationFieldType> FieldIteratorType;
+            FieldIteratorType currIter( deffield, deffield->GetLargestPossibleRegion() );
+            FieldIteratorType trueIter( m_TrueField, deffield->GetLargestPossibleRegion() );
 
             m_CompWarpGradientCalculator->SetInputImage( deffield );
 
@@ -271,16 +268,12 @@ public:
                fieldDist += (currIter.Value() - trueIter.Value()).GetSquaredNorm();
 
                // No need to add Id matrix here as we do a substraction
-               tmp = (
-                  ( m_CompWarpGradientCalculator->EvaluateAtIndex(currIter.GetIndex())
-                    -m_TrueWarpGradientCalculator->EvaluateAtIndex(trueIter.GetIndex())
+               tmp = ( ( m_CompWarpGradientCalculator->EvaluateAtIndex(currIter.GetIndex()) -m_TrueWarpGradientCalculator->EvaluateAtIndex(trueIter.GetIndex())
                      ).GetVnlMatrix() ).frobenius_norm();
                fieldGradDist += tmp*tmp;
             }
-            fieldDist = sqrt( fieldDist/ (double)(
-                     deffield->GetLargestPossibleRegion().GetNumberOfPixels()) );
-            fieldGradDist = sqrt( fieldGradDist/ (double)(
-                     deffield->GetLargestPossibleRegion().GetNumberOfPixels()) );
+            fieldDist = sqrt( fieldDist/ (double)( deffield->GetLargestPossibleRegion().GetNumberOfPixels()) );
+            fieldGradDist = sqrt( fieldGradDist/ (double)( deffield->GetLargestPossibleRegion().GetNumberOfPixels()) );
             
             std::cout<<"d(.,true) "<<fieldDist<<" - ";
             std::cout<<"d(.,Jac(true)) "<<fieldGradDist<<" - ";
@@ -296,8 +289,7 @@ public:
          m_JacobianFilter->UpdateLargestPossibleRegion();
 
         
-         const unsigned int numPix = m_JacobianFilter->
-            GetOutput()->GetLargestPossibleRegion().GetNumberOfPixels();
+         const unsigned int numPix = m_JacobianFilter-> GetOutput()->GetLargestPossibleRegion().GetNumberOfPixels();
          
          TPixel* pix_start = m_JacobianFilter->GetOutput()->GetBufferPointer();
          TPixel* pix_end = pix_start + numPix;
@@ -310,8 +302,7 @@ public:
          {
             if ( *jac_ptr<=0.0 ) ++jacBelowZero;
          }
-         const double jacBelowZeroPrc = static_cast<double>(jacBelowZero)
-            / static_cast<double>(numPix);
+         const double jacBelowZeroPrc = static_cast<double>(jacBelowZero) / static_cast<double>(numPix);
          
 
          // Get min an max jac
@@ -592,7 +583,9 @@ protected:
      typename MultiResRegistrationFilterType::Pointer multires = MultiResRegistrationFilterType::New();
      multires->SetRegistrationFilter( filter );
      multires->SetNumberOfLevels( args.numLevels );
-     multires->SetNumberOfIterations( &args.numIterations ); // multires->SetNumberOfIterations( &args.numIterations[0] );
+
+     std::vector<unsigned int> numIterationsVector= std::vector<unsigned int>(args.numLevels, args.numIterations);
+     multires->SetNumberOfIterations( &numIterationsVector[0]); // multires->SetNumberOfIterations( &args.numIterations[0] );
      multires->SetFixedImage( fixedimage );
      multires->SetMovingImage( movingimage );
      if ( args.verbosity > 0 )
@@ -612,6 +605,7 @@ protected:
       std::cout << err << std::endl;
       exit( EXIT_FAILURE );
    }
+     std::cout << "numiterations: " << args.numIterations << std::endl;
 
  // The outputs
    typename DeformationFieldType::Pointer defField = 0;
