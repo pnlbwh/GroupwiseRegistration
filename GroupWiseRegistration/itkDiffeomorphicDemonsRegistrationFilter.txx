@@ -55,7 +55,10 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
 
   std::cout << "initializeiteration: " << std::endl;
   f->SetDeformationField( this->GetDeformationField() );
-  f->SetInvDeformationField( this->GetInvDeformationField() );
+  if (this->GetInvDeformationField() == NULL)
+    f->SetInvDeformationField( this->GetDeformationField() );
+  else
+    f->SetInvDeformationField( this->GetInvDeformationField() );
 
   // call the superclass  implementation ( initializes f )
   Superclass::InitializeIteration();
