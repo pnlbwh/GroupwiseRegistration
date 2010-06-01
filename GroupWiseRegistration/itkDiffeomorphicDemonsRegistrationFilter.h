@@ -159,6 +159,8 @@ protected:
   /** Apply update. */
   virtual void ApplyUpdate(TimeStepType dt);
 
+  virtual DeformationFieldType *GetInvDeformationField() const;
+
 private:
   DiffeomorphicDemonsRegistrationFilter(const Self&); //purposely not implemented
   void operator=(const Self&); //purposely not implemented
