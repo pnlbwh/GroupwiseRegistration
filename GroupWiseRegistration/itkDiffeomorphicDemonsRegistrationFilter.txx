@@ -32,6 +32,8 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
 
   m_Adder = AdderType::New();
   m_Adder->InPlaceOn();
+
+  this->SetInvDeformationField(NULL);
 }
 
 
@@ -53,12 +55,15 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
     itkExceptionMacro(<<"FiniteDifferenceFunction not of type DemonsRegistrationFunctionType");
     }
 
-  std::cout << "initializeiteration: " << std::endl;
+  std::cout << "In InitializeIteration() " << std::endl;
   f->SetDeformationField( this->GetDeformationField() );
   if (this->GetInvDeformationField() == NULL)
     f->SetInvDeformationField( this->GetDeformationField() );
   else
+  {
     f->SetInvDeformationField( this->GetInvDeformationField() );
+  std::cout << "inv deformation origin: " << this->GetInvDeformationField()->GetOrigin() << std::endl;
+  }
 
   // call the superclass  implementation ( initializes f )
   Superclass::InitializeIteration();
@@ -375,22 +380,25 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
   m_Multiplier->SetInput( this->GetUpdateBuffer() );
   m_Multiplier->Update();
   m_Exponentiator->SetInput( m_Multiplier->GetOutput() );
-  m_Warper->SetInput( this->GetInvDeformationField() );
-  m_Warper->SetDeformationField( m_Exponentiator->GetOutput() );
-  m_Adder->SetInput1( m_Warper->GetOutput() );
-  m_Adder->SetInput2( m_Exponentiator->GetOutput() );
+  if (this->GetInvDeformationField() == NULL)
+    this->SetInvDeformationField(m_Exponentiator->GetOutput());
+  else
+  {
+  // m_Warper->SetOutputSpacing( this->GetDeformationField()->GetSpacing() );
+  // m_Warper->SetOutputOrigin( this->GetDeformationField()->GetOrigin() );
+    // std::cout << "in here" << std::endl;
+    // m_Warper->SetInput( this->GetInvDeformationField() );
+    // m_Warper->SetDeformationField( m_Exponentiator->GetOutput() );
+    // m_Adder->SetInput1( m_Warper->GetOutput() );
+    // m_Adder->SetInput2( m_Exponentiator->GetOutput() );
+    // this->SetInvDeformationField( m_Adder->GetOutput() );
+
+  }
+
   // m_Adder->GetOutput()->SetRequestedRegion( this->GetInvDeformationField()->GetRequestedRegion() );
-  m_Adder->Update();
+  //
+  // m_Adder->Update();
 
-}
-
-template <class TFixedImage, class TMovingImage, class TDeformationField>
-typename PDEDeformableRegistrationFilter< TFixedImage, TMovingImage,TDeformationField>::DeformationFieldType *
-DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField>
-::GetInvDeformationField() const
-{
-  // return invDeformationField;
-  return NULL;
 }
 
 template <class TFixedImage, class TMovingImage, class TDeformationField>

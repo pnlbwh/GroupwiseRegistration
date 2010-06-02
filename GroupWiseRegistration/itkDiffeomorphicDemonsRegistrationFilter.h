@@ -144,6 +144,16 @@ public:
   virtual void SetMaximumUpdateStepLength(double);
   virtual double GetMaximumUpdateStepLength() const;
 
+  typedef typename DeformationFieldType::Pointer   DeformationFieldTypePointer;
+
+  DeformationFieldTypePointer m_invDeformationField;
+
+  void SetInvDeformationField(  DeformationFieldTypePointer ptr )
+  { m_invDeformationField = ptr; }
+
+  DeformationFieldType * GetInvDeformationField(void)
+  { return m_invDeformationField; }
+
 protected:
   DiffeomorphicDemonsRegistrationFilter();
   ~DiffeomorphicDemonsRegistrationFilter() {}
@@ -159,8 +169,6 @@ protected:
   /** Apply update. */
   virtual void ApplyUpdate(TimeStepType dt);
 
-  virtual DeformationFieldType *GetInvDeformationField() const;
-
 private:
   DiffeomorphicDemonsRegistrationFilter(const Self&); //purposely not implemented
   void operator=(const Self&); //purposely not implemented
@@ -169,6 +177,7 @@ private:
   FieldExponentiatorPointer m_Exponentiator;
   VectorWarperPointer       m_Warper;
   AdderPointer              m_Adder;
+
 };
 
 
