@@ -201,14 +201,30 @@ namespace itk {
     m_FixedImageGradientCalculator->SetInputImage( this->GetFixedImage() );
     m_MappedMovingImageGradientCalculator->SetInputImage( this->GetMovingImage() );
     
+    std::cout << "In itkESMInvConDemonsRegistrationFunction:InitializeIteration " << std::endl;
     // Compute warped moving image
     m_MovingImageWarper->SetOutputSpacing( this->GetFixedImage()->GetSpacing() );
     m_MovingImageWarper->SetOutputOrigin( this->GetFixedImage()->GetOrigin() );
     m_MovingImageWarper->SetOutputDirection( this->GetFixedImage()->GetDirection() );
     m_MovingImageWarper->SetInput( this->GetMovingImage() );
+    std::cout << "itkESMInvConDemonsRegistrationFunction::InitializeIteration: moving image size" << this->GetMovingImage()->GetLargestPossibleRegion().GetSize()[0] << std::endl;
+    std::cout << "itkESMInvConDemonsRegistrationFunction::InitializeIteration: moving image size" << this->GetMovingImage()->GetLargestPossibleRegion().GetSize()[1] << std::endl;
+    std::cout << "itkESMInvConDemonsRegistrationFunction::InitializeIteration: moving image size" << this->GetMovingImage()->GetLargestPossibleRegion().GetSize()[2] << std::endl;
+    std::cout << "itkESMInvConDemonsRegistrationFunction::InitializeIteration: moving image requested size" << this->GetMovingImage()->GetRequestedRegion().GetSize()[0] << std::endl;
+    std::cout << "itkESMInvConDemonsRegistrationFunction::InitializeIteration: moving image requested size" << this->GetMovingImage()->GetRequestedRegion().GetSize()[1] << std::endl;
+    std::cout << "itkESMInvConDemonsRegistrationFunction::InitializeIteration: moving image requested size" << this->GetMovingImage()->GetRequestedRegion().GetSize()[2] << std::endl;
     m_MovingImageWarper->SetDeformationField( this->GetDeformationField() );
+    std::cout << "itkESMInvConDemonsRegistrationFunction::InitializeIteration: deformation size" << this->GetDeformationField()->GetLargestPossibleRegion().GetSize()[0] << std::endl;
+    std::cout << "itkESMInvConDemonsRegistrationFunction::InitializeIteration: deformation size" << this->GetDeformationField()->GetLargestPossibleRegion().GetSize()[1] << std::endl;
+    std::cout << "itkESMInvConDemonsRegistrationFunction::InitializeIteration: deformation size" << this->GetDeformationField()->GetLargestPossibleRegion().GetSize()[2] << std::endl;
+    std::cout << "itkESMInvConDemonsRegistrationFunction::InitializeIteration: requested deformation size" << this->GetDeformationField()->GetRequestedRegion().GetSize()[0] << std::endl;
+    std::cout << "itkESMInvConDemonsRegistrationFunction::InitializeIteration: requested deformation size" << this->GetDeformationField()->GetRequestedRegion().GetSize()[1] << std::endl;
+    std::cout << "itkESMInvConDemonsRegistrationFunction::InitializeIteration: requested deformation size" << this->GetDeformationField()->GetRequestedRegion().GetSize()[2] << std::endl;
+    std::cout << "In itkESMInvConDemonsRegistrationFunction:InitializeIteration: about to set region for moving image warper" << std::endl;
     m_MovingImageWarper->GetOutput()->SetRequestedRegion( this->GetDeformationField()->GetRequestedRegion() );
+    std::cout << "In itkESMInvConDemonsRegistrationFunction:InitializeIteration: about to warp moving image" << std::endl;
     m_MovingImageWarper->Update();
+    std::cout << "In itkESMInvConDemonsRegistrationFunction:InitializeIteration:after warped moving image " << std::endl;
     
     // Compute warped moving image
     m_FixedImageWarper->SetOutputSpacing( this->GetFixedImage()->GetSpacing() );
@@ -218,6 +234,7 @@ namespace itk {
     m_FixedImageWarper->SetDeformationField( this->GetInvDeformationField() );
     m_FixedImageWarper->GetOutput()->SetRequestedRegion( this->GetInvDeformationField()->GetRequestedRegion() );
     m_FixedImageWarper->Update();
+    std::cout << "In itkESMInvConDemonsRegistrationFunction:InitializeIteration:after warped fixed image " << std::endl;
     
     // setup moving image interpolator for further access
     m_MovingImageInterpolator->SetInputImage( this->GetMovingImage() );
@@ -227,7 +244,9 @@ namespace itk {
     m_SumOfSquaredDifference  = 0.0;
     m_NumberOfPixelsProcessed = 0L;
     m_SumOfSquaredChange      = 0.0;
-    }
+
+    std::cout << "In itkESMInvConDemonsRegistrationFunction:InitializeIteration: leaving" << std::endl;
+}
     
     
 /**
@@ -240,6 +259,7 @@ namespace itk {
     ::ComputeUpdate(const NeighborhoodType &it, void * gd,
     const FloatOffsetType& itkNotUsed(offset))
 {
+    // std::cout << "In itkESMInvConDemonsRegistrationFunction:ComputeUpdate: start" << std::endl;
     
     GlobalDataStruct *globalData = (GlobalDataStruct *)gd;
     PixelType update;

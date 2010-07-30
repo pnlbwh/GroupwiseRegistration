@@ -451,7 +451,6 @@ protected:
 
   // Set up pyramids
   
-  
   // Begin inconvforces
      typedef float                                        VectorComponentType;
      typedef itk::Vector<VectorComponentType, Dimension>  VectorPixelType;
@@ -479,7 +478,10 @@ protected:
      typename DeformationFieldType::SizeType       size;
      typename DeformationFieldType::IndexType      start;
 
-     std::cout<<"####Fixed image origin: "<<fixedimage->GetOrigin()<<std::endl;
+     std::cout<<"GroupWiseRegistration:Fixed image origin: "<<fixedimage->GetOrigin()<<std::endl;
+     std::cout<<"GroupWiseRegistration:Fixed image size: "<<fixedimage->GetLargestPossibleRegion().GetSize()[0]<<std::endl;
+     std::cout<<"GroupWiseRegistration:Fixed image size: "<<fixedimage->GetLargestPossibleRegion().GetSize()[1]<<std::endl;
+     std::cout<<"GroupWiseRegistration:Fixed image size: "<<fixedimage->GetLargestPossibleRegion().GetSize()[2]<<std::endl;
      //std::cout<<"Fixed image spacing: "<<fixedimage->GetSpacing()<<std::endl;
      size = movingImageReader->GetOutput()->GetLargestPossibleRegion().GetSize();
      for (unsigned int d=0; d<Dimension; d++)
@@ -607,6 +609,9 @@ protected:
    }
      std::cout << "numiterations: " << args.numIterations << std::endl;
 
+
+   exit(0);
+
  // The outputs
    typename DeformationFieldType::Pointer defField = 0;
    defField = multires->GetOutput();
@@ -618,9 +623,9 @@ protected:
    // warp the result
    typedef itk::WarpImageFilter < ImageType, ImageType, DeformationFieldType >  WarperType;
    warper->SetInput( movingimage );
-       warper->SetInput( movingImageReader->GetOutput() );
-       warper->SetOutputSpacing( spacing );
-       warper->SetOutputOrigin( origin );
+   warper->SetInput( movingImageReader->GetOutput() );
+   warper->SetOutputSpacing( spacing );
+   warper->SetOutputOrigin( origin );
    // warper->SetOutputSpacing( fixedimage->GetSpacing() );
    // warper->SetOutputOrigin( fixedimage->GetOrigin() );
    warper->SetDeformationField( defField );
@@ -648,7 +653,6 @@ protected:
       exit( EXIT_FAILURE );
    }
 
-   exit(0);
 
 
   // Run demons registration 

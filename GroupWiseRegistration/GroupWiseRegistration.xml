@@ -91,6 +91,14 @@
         <step>1</step>
       </constraints>
     </integer>
+    <!--<integer-vector>
+      <name>iteration</name>
+      <flag>i</flag>
+      <longflag>num_iterations</longflag>
+      <description>Number of Iterations per Level</description> 
+      <label>Iterations</label>
+      <default>20,20,20</default>
+    </integer-vector>  -->
     <integer>
       <name>numInnerIterations</name>
       <longflag>num_inner_iterations</longflag>
