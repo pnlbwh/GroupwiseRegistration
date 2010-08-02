@@ -479,10 +479,9 @@ protected:
      typename DeformationFieldType::IndexType      start;
 
      std::cout<<"GroupWiseRegistration:Fixed image origin: "<<fixedimage->GetOrigin()<<std::endl;
-     std::cout<<"GroupWiseRegistration:Fixed image size: "<<fixedimage->GetLargestPossibleRegion().GetSize()[0]<<std::endl;
-     std::cout<<"GroupWiseRegistration:Fixed image size: "<<fixedimage->GetLargestPossibleRegion().GetSize()[1]<<std::endl;
-     std::cout<<"GroupWiseRegistration:Fixed image size: "<<fixedimage->GetLargestPossibleRegion().GetSize()[2]<<std::endl;
-     //std::cout<<"Fixed image spacing: "<<fixedimage->GetSpacing()<<std::endl;
+     std::cout<<"GroupWiseRegistration:Fixed image size: "<<fixedimage->GetLargestPossibleRegion().GetSize()[0] << " " <<
+         "GroupWiseRegistration:Fixed image size: "<<fixedimage->GetLargestPossibleRegion().GetSize()[1] << " " <<
+         "GroupWiseRegistration:Fixed image size: "<<fixedimage->GetLargestPossibleRegion().GetSize()[2];
      size = movingImageReader->GetOutput()->GetLargestPossibleRegion().GetSize();
      for (unsigned int d=0; d<Dimension; d++)
      {
