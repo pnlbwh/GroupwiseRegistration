@@ -6,6 +6,7 @@
 #define ITK_LEAN_AND_MEAN
 #endif
 
+#include <sstream>
 #include <iostream>
 #include <algorithm>
 #include <string>
@@ -23,6 +24,8 @@
 #include <itkImageRegionIterator.h>
 #include <itkImageRegionConstIterator.h>
 
+#include "itkAddImageFilter.h"
+
 #include "itkOrientedImage.h"
 #include "itkOrientImageFilter.h"
 #include "itkMultiResolutionPDEDeformableRegistration2.h"
@@ -39,6 +42,7 @@
 
 #include <itkDisplacementFieldJacobianDeterminantFilter.h>
 #include "itkMultiplyByConstantImageFilter.h"
+#include "itkDivideImageFilter.h"
 #include "itkDiscreteGaussianImageFilter.h"
 #include "itkImageFileReader.h"
 #include "itkImageFileWriter.h"
@@ -419,28 +423,42 @@ protected:
 };
 
 
-  template <unsigned int Dimension>
-  void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], std::string resultsDirectory, std::string outputVolume, bool useJacFlag )
+template <class TImage, class TDeformationFieldType>
+void ComputeTemplate( arguments args, int iter, bool useWarps )
+{
+  typedef typename itk::ImageFileReader< TImage > ImageReaderType;
+  typedef typename itk::ImageFileReader< TDeformationFieldType > DefFieldReaderType;
+  typedef itk::AddImageFilter<TImage, TImage, TImage> AdderType;
+  typedef itk::ImageFileWriter< TImage >  WriterType;
+  typename ImageReaderType::Pointer         imageReader = ImageReaderType::New();
+  typename DefFieldReaderType::Pointer      defFieldReader = DefFieldReaderType::New();
+  typename WriterType::Pointer              writer =  WriterType::New();
+  typename AdderType::Pointer               adder = AdderType::New();
+  typename AdderType::Pointer               adder2 = AdderType::New();
+  typename TImage::Pointer                  template_vol =  TImage::New();
+
+  typedef itk::WarpImageFilter <TImage, TImage, TDeformationFieldType>      WarperType;
+  typename WarperType::Pointer            warper = WarperType::New();
+
+  typedef itk::DisplacementFieldJacobianDeterminantFilter <TDeformationFieldType, float>    JacobianDeterminantFilterType;
+  typename JacobianDeterminantFilterType::Pointer jacdetfilter = JacobianDeterminantFilterType::New();
+  typename TImage::Pointer 			       jacobianimage = TImage::New();
+  typename TImage::Pointer                  jacobian = 0;
+  typename TImage::Pointer                  image = 0;
+  typename TImage::Pointer                  weight = TImage::New();
+
+  typename TImage::RegionType     region;
+  typename TImage::IndexType      start;
+
+
+  for (int i=0; i < args.volumeFileNames.size(); i++)
   {
+    std::cout << args.volumeFileNames[i] << std::endl;
 
-  // Declare the types of the images
-    typedef float PixelType;
-    typedef itk::OrientedImage< PixelType, Dimension >  OrientedImageType;// read and transform oriented images, operate on non-oriented
-    typedef itk::OrientImageFilter<OrientedImageType,OrientedImageType> OrientFilterType;//##
-    typedef itk::Image< PixelType, Dimension > ImageType;
-
-    //{//for mem allocations
-
-  // Set up the file readers
-    typedef typename itk::ImageFileReader< OrientedImageType > ImageReaderType;
-    typename ImageReaderType::Pointer fixedImageReader  = ImageReaderType::New();
-    typename ImageReaderType::Pointer movingImageReader = ImageReaderType::New();
-    fixedImageReader->SetFileName( p_arrVolumeNames[0]);  //TODO: test array
-    movingImageReader->SetFileName( p_arrVolumeNames[1] );
+    imageReader->SetFileName( args.volumeFileNames[i] );
     try
     {
-      fixedImageReader->Update();
-      movingImageReader->Update();
+      imageReader->Update();
     }
     catch( itk::ExceptionObject& err )
     {
@@ -448,457 +466,301 @@ protected:
       std::cout << err << std::endl;
       exit( EXIT_FAILURE );
     }
+    image = imageReader->GetOutput();
 
-  // Set up pyramids
+    if (i==0)
+    {
+      region.SetSize( image->GetLargestPossibleRegion().GetSize() );
+      start.Fill(0);
+      region.SetIndex( start );
+      template_vol->SetDirection( image->GetDirection() );
+      template_vol->SetOrigin( image->GetOrigin() );
+      template_vol->SetSpacing( image->GetSpacing());
+      template_vol->SetRegions( region );
+      template_vol->Allocate();
+      template_vol->FillBuffer( 0.0 );
+    }
+
+
+    if (useWarps)
+    {
+      if (i==0)
+      {
+        region.SetSize( image->GetLargestPossibleRegion().GetSize() );
+        start.Fill(0);
+        region.SetIndex( start );
+        weight->SetDirection( image->GetDirection() );
+        weight->SetOrigin( image->GetOrigin() );
+        weight->SetSpacing( image->GetSpacing() );
+        weight->SetRegions( region );
+        weight->Allocate();
+        weight->FillBuffer( 0.0 );
+      }
+      std::stringstream deformation_name;
+      deformation_name << args.volumeFileNames[i] << "_" << iter-1 << "_" "deformation.nii.gz";
+      defFieldReader->SetFileName( deformation_name.str() );
+      // defFieldReader->SetFileName( args.volumeFileNames[i] + "-deformation.nii.gz");
+      try
+      {
+        defFieldReader->Update();
+      }
+      catch( itk::ExceptionObject& err )
+      {
+        std::cout << "Could not read one of the deformation fields." << std::endl;
+        std::cout << err << std::endl;
+        exit( EXIT_FAILURE );
+      }
+      warper->SetInput( image );
+      warper->SetOutputSpacing( image->GetSpacing() );
+      warper->SetOutputOrigin( image->GetOrigin() );
+      warper->SetOutputDirection( image->GetDirection() );
+      warper->SetDeformationField( defFieldReader->GetOutput() );
+      image = warper->GetOutput();
+
+      jacdetfilter->SetInput( defFieldReader->GetOutput() );
+      jacdetfilter->SetUseImageSpacing( false );
+      jacdetfilter->UpdateLargestPossibleRegion();
+      adder2->SetInput1( weight );
+      adder2->SetInput2( jacdetfilter->GetOutput() );
+      adder2->Update();
+      weight = adder2->GetOutput();
+    }
+
+    adder->SetInput1( template_vol );
+    adder->SetInput2( image );
+    adder->Update();
+    template_vol = adder->GetOutput();
+  }
+
+  if (useWarps)
+  {
+    typedef itk::DivideImageFilter<TImage, TImage, TImage>   DivideByImageType;
+    typename DivideByImageType::Pointer  divider = DivideByImageType::New();
+    divider->SetInput1( template_vol );
+    divider->SetInput2( weight );
+    divider->Update();
+    template_vol = divider->GetOutput();
+  }
+  else
+  {
+    typedef itk::MultiplyByConstantImageFilter< TImage, float, TImage >   MultiplyByConstantType;
+    typename MultiplyByConstantType::Pointer  multiplier = MultiplyByConstantType::New();
+    multiplier->SetConstant( 1.0/args.volumeFileNames.size() );
+    multiplier->SetInput( template_vol );
+    multiplier->Update();
+    template_vol = multiplier->GetOutput();
+  }
+
+  /*
+   * Write the template volume to disk
+   */
+  // writer->SetFileName( args.outputImageFile.c_str() );
+  std::stringstream template_name;
+  template_name << "template" << iter << ".nii.gz";
+  writer->SetFileName( template_name.str() );
+  writer->SetUseCompression( true );
+  writer->SetInput( template_vol );
+  try
+  {
+    writer->Update();
+  }
+  catch( itk::ExceptionObject& err )
+  {
+    std::cout << "Unexpected error." << std::endl;
+    std::cout << err << std::endl;
+    exit( EXIT_FAILURE );
+  }
+
+}
+
+
+template <unsigned int Dimension>
+void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], std::string resultsDirectory, std::string outputVolume, bool useJacFlag )
+{
+  typedef float PixelType;
+  typedef itk::OrientedImage< PixelType, Dimension >  OrientedImageType;// read and transform oriented images, operate on non-oriented
+  typedef itk::Image< PixelType, Dimension > ImageType;
+  typedef float VectorComponentType;
+  typedef itk::Vector<VectorComponentType, Dimension>  VectorPixelType;
+  typedef itk::Image<VectorPixelType, Dimension>       DeformationFieldType;
+  typedef itk::ESMInvConDemonsRegistrationFunction <ImageType, ImageType,DeformationFieldType>  DemonsRegistrationFunctionType;
+  typedef typename itk::ImageFileReader< ImageType > ImageReaderType;
+  typedef typename itk::ImageFileReader< DeformationFieldType > DeformationReaderType;
+  typedef itk::ImageFileWriter< DeformationFieldType >  DeformationWriterType;
+  typedef itk::ImageFileWriter< ImageType >  WriterType;
+  typename WriterType::Pointer      writer =  WriterType::New();
+  std::stringstream template_name;
+  std::stringstream deformation_name;
+
+  //{//for mem allocations
+
+  // typename DeformationReaderType::Pointer deformationReader  = DeformationReaderType::New();
+  // deformationReader->SetFileName( "deformation.nii.gz" );
+  // try
+  // {
+  //   deformationReader->Update();
+  // }
+  // catch( itk::ExceptionObject& err )
+  // {
+  //   std::cout << "Could not read the input deformatoin field." << std::endl;
+  //   std::cout << err << std::endl;
+  //   exit( EXIT_FAILURE );
+  // }
+
+
+  /*
+   * Compute the template
+   */
+  ComputeTemplate<ImageType, DeformationFieldType>(args, 0, false);
   
-  // Begin inconvforces
-     typedef float                                        VectorComponentType;
-     typedef itk::Vector<VectorComponentType, Dimension>  VectorPixelType;
-     typedef itk::Image<VectorPixelType, Dimension>       DeformationFieldType;
-     typedef itk::ESMInvConDemonsRegistrationFunction <ImageType,ImageType,DeformationFieldType>  DemonsRegistrationFunctionType;
-     typedef itk::DisplacementFieldJacobianDeterminantFilter <DeformationFieldType, PixelType>    JacobianDeterminantFilterType;
-     typedef itk::WarpImageFilter <ImageType, ImageType, DeformationFieldType>      WarperType;
+  
+  /*
+   * Run the registration
+   */
+  typename ImageReaderType::Pointer imageReader = ImageReaderType::New();
 
-     typename DeformationFieldType::Pointer  log_field = DeformationFieldType::New();
-     typename DeformationFieldType::Pointer  log_inv_field = DeformationFieldType::New();
-     typename DeformationFieldType::Pointer  update = DeformationFieldType::New();
-     typename WarperType::Pointer            warper = WarperType::New();
-     typename ImageType::Pointer  		       fixedimage = fixedImageReader->GetOutput();
-     typename ImageType::Pointer 			       movingimage = movingImageReader->GetOutput();
-     typename ImageType::Pointer 			       jacobianimage = ImageType::New();
+  for (unsigned int j = 0; j < args.numOuterIterations; ++j)
+  {
+    /*
+     * Load the template from disk
+     */
+    template_name.str("");
+    template_name << "template" << j << ".nii.gz";
 
-     //invcondemonsforces<PixelType, ImageType, DeformationFieldType, 3>(fixedimage, movingimage, field, inv_field, 3, 0, 3);
-     typename DeformationFieldType::SpacingType 	 spacing;
-     spacing.Fill( 1.0 );
-     typename DeformationFieldType::PointType   	 origin;
-     //origin.Fill( 0.0 );
-     //typename DeformationFieldType::SpacingType 	 spacing = movingimage->GetSpacing();
-     //typename DeformationFieldType::PointType   	 origin  = movingimage->GetOrigin();
-     typename DeformationFieldType::RegionType     region;
-     typename DeformationFieldType::SizeType       size;
-     typename DeformationFieldType::IndexType      start;
-
-     std::cout<<"GroupWiseRegistration:Fixed image origin: "<<fixedimage->GetOrigin()<<std::endl;
-     std::cout<<"GroupWiseRegistration:Fixed image size: "<<fixedimage->GetLargestPossibleRegion().GetSize()[0] << " " <<
-         "GroupWiseRegistration:Fixed image size: "<<fixedimage->GetLargestPossibleRegion().GetSize()[1] << " " <<
-         "GroupWiseRegistration:Fixed image size: "<<fixedimage->GetLargestPossibleRegion().GetSize()[2];
-     size = movingImageReader->GetOutput()->GetLargestPossibleRegion().GetSize();
-     for (unsigned int d=0; d<Dimension; d++)
-     {
-       start[d] = 0;
-       origin[d] = -127;
-     }
-     //start.Fill(0);
-     region.SetSize( size );
-     region.SetIndex( start );
-
-
-     //todo: test this
-     VectorPixelType initialvalue;
-     initialvalue.Fill( 0.0 );
-     //
-     log_field->SetOrigin( origin );
-     log_field->SetSpacing( spacing );
-     log_field->SetRegions( region );
-     log_field->Allocate();
-     log_field->FillBuffer( 0.0 );
-     update->SetOrigin( origin );
-     update->SetSpacing( spacing );
-     update->SetRegions( region );
-     update->Allocate();
-     update->FillBuffer( 0.0 );
-
-  // Compute exponentials
-     typedef itk::ExponentialDeformationFieldImageFilter <DeformationFieldType, DeformationFieldType>      FieldExponentiatorType;
-     typename FieldExponentiatorType::Pointer exponentiatorOfLogField= FieldExponentiatorType::New();
-     typename FieldExponentiatorType::Pointer exponentiatorOfNegativeLogField = FieldExponentiatorType::New();
-
-     //exponentiatorOfLogField->SetInput( log_field );
-     //exponentiatorOfLogField->UpdateLargestPossibleRegion();
-     exponentiatorOfLogField->AutomaticNumberOfIterationsOn();
-     exponentiatorOfLogField->SetMaximumNumberOfIterations( 2000u ); // Just set a high value so that automatic number of step // is not thresholded
-     exponentiatorOfNegativeLogField->AutomaticNumberOfIterationsOn();
-     exponentiatorOfNegativeLogField->SetMaximumNumberOfIterations( 2000u ); // Just set a high value so that automatic number of step // is not thresholded
-     typename DeformationFieldType::Pointer field; //= exponentiatorOfLogField->GetOutput();
-     typename DeformationFieldType::Pointer inv_field; //= exponentiatorOfNegativeLogField->GetOutput();
-
-     typedef itk::MultiplyByConstantImageFilter< DeformationFieldType, signed int, DeformationFieldType > MultiplyByConstantType;
-     typedef typename MultiplyByConstantType::Pointer   MultiplyByConstantPointer;
-     MultiplyByConstantPointer m_Multiplier = MultiplyByConstantType::New();
-     m_Multiplier->SetConstant( -1 );
-
-  // Compute jacobian determinant
-     typename JacobianDeterminantFilterType::Pointer jacdetfilter = JacobianDeterminantFilterType::New();
-     typedef itk::MinimumMaximumImageCalculator<ImageType> MinMaxFilterType;
-     typename MinMaxFilterType::Pointer minmaxfilter = MinMaxFilterType::New();
-    // if (useJacFlag > 0)
-    // {
-    //   jacdetfilter->SetInput( field );
-    //   jacdetfilter->SetUseImageSpacing( false );
-    //   jacdetfilter->UpdateLargestPossibleRegion();
-    //   jacobianimage = jacdetfilter->GetOutput();
-    //   minmaxfilter->SetImage( jacdetfilter->GetOutput() );
-    //   minmaxfilter->Compute();
-    //   std::cout<<"Minimum of the determinant of the Jacobian of the warp: " <<minmaxfilter->GetMinimum()<<std::endl;
-    //   std::cout<<"Maximum of the determinant of the Jacobian of the warp: " <<minmaxfilter->GetMaximum()<<std::endl;
-    // }
-
-  // Set up demons registration function
-     typename DemonsRegistrationFunctionType::Pointer drfp = DemonsRegistrationFunctionType::New();
-     typename DemonsRegistrationFunctionType::GradientType gtype = DemonsRegistrationFunctionType::Symmetric;
-     drfp->SetUseGradientType( gtype );
-     drfp->SetRegWeight( args.regWeight );
-
-  // set up demons filter 
-     typedef typename itk::DiffeomorphicDemonsRegistrationFilter < ImageType, ImageType, DeformationFieldType>   ActualRegistrationFilterType;
-     //typedef typename ActualRegistrationFilterType::GradientType GradientType;
-     typename ActualRegistrationFilterType::Pointer filter = ActualRegistrationFilterType::New();
-     //filter->SetMaximumUpdateStepLength( args.maxStepLength );
-     filter->SetMaximumUpdateStepLength( 1e1 ); //TODO: check this
-     //filter->SetUseGradientType( static_cast<GradientType>(args.gradientType) );
-     filter->SetUseGradientType( gtype );
-    if ( args.sigmaDef > 0.1 )
-       {
-         filter->SmoothDeformationFieldOn();
-         filter->SetStandardDeviations( args.sigmaDef );
-       }
-       else
-          filter->SmoothDeformationFieldOff();
-
-       if ( args.sigmaUp > 0.1 )
-       {
-          filter->SmoothUpdateFieldOn();
-          filter->SetUpdateFieldStandardDeviations( args.sigmaUp );
-       }
-       else
-          filter->SmoothUpdateFieldOff();
-
-       if ( args.verbosity > 0 )
-       {      
-         typename CommandIterationUpdate<PixelType, Dimension>::Pointer observer = CommandIterationUpdate<PixelType, Dimension>::New();
-         filter->AddObserver( itk::IterationEvent(), observer );
-       }
-
- // Set up the multi-resolution filter
-     typedef typename itk::MultiResolutionPDEDeformableRegistration2< ImageType, ImageType, DeformationFieldType, PixelType >   MultiResRegistrationFilterType;
-     typename MultiResRegistrationFilterType::Pointer multires = MultiResRegistrationFilterType::New();
-     multires->SetRegistrationFilter( filter );
-     multires->SetNumberOfLevels( args.numLevels );
-
-     std::vector<unsigned int> numIterationsVector= std::vector<unsigned int>(args.numLevels, args.numIterations);
-     multires->SetNumberOfIterations( &numIterationsVector[0]); // multires->SetNumberOfIterations( &args.numIterations[0] );
-     multires->SetFixedImage( fixedimage );
-     multires->SetMovingImage( movingimage );
-     if ( args.verbosity > 0 )
-     {
-       typename CommandIterationUpdate<PixelType, Dimension>::Pointer multiresobserver = CommandIterationUpdate<PixelType, Dimension>::New();
-       multires->AddObserver( itk::IterationEvent(), multiresobserver );
-     }
-
- //Compute the deformation field
-   try
-   {
-      multires->UpdateLargestPossibleRegion();
-   }
-   catch( itk::ExceptionObject& err )
-   {
-      std::cout << "Unexpected error." << std::endl;
-      std::cout << err << std::endl;
-      exit( EXIT_FAILURE );
-   }
-     std::cout << "numiterations: " << args.numIterations << std::endl;
-
-
-   exit(0);
-
- // The outputs
-   typename DeformationFieldType::Pointer defField = 0;
-   defField = multires->GetOutput();
-   defField->DisconnectPipeline();
-
-   //}//end for mem allocations
-
-   
-   // warp the result
-   typedef itk::WarpImageFilter < ImageType, ImageType, DeformationFieldType >  WarperType;
-   warper->SetInput( movingimage );
-   warper->SetInput( movingImageReader->GetOutput() );
-   warper->SetOutputSpacing( spacing );
-   warper->SetOutputOrigin( origin );
-   // warper->SetOutputSpacing( fixedimage->GetSpacing() );
-   // warper->SetOutputOrigin( fixedimage->GetOrigin() );
-   warper->SetDeformationField( defField );
-   
-   // Write warped image out to file
-   typedef PixelType OutputPixelType;
-   typedef itk::Image< OutputPixelType, Dimension > OutputImageType;
-   typedef itk::CastImageFilter < ImageType, OutputImageType > CastFilterType;
-   typedef itk::ImageFileWriter< OutputImageType >  WriterType;
-   
-   typename WriterType::Pointer      writer =  WriterType::New();
-   typename CastFilterType::Pointer  caster =  CastFilterType::New();
-   writer->SetFileName( args.outputImageFile.c_str() );
-   caster->SetInput( warper->GetOutput() );
-   writer->SetInput( caster->GetOutput()   );
-   writer->SetUseCompression( true );
-   try
-   {
-      writer->Update();
-   }
-   catch( itk::ExceptionObject& err )
-   {
-      std::cout << "Unexpected error." << std::endl;
-      std::cout << err << std::endl;
-      exit( EXIT_FAILURE );
-   }
-
-
-
-  // Run demons registration 
-     int numIter = 1;
-     int strike = 0;
-     float mse[numIter]; 
-     for (int i = 0; i < numIter; i++) 
-     {
-       std::cout<<"i = "<<i<<std::endl;
-
-       exponentiatorOfLogField->SetInput( log_field );
-       exponentiatorOfLogField->UpdateLargestPossibleRegion();
-       field = exponentiatorOfLogField->GetOutput();
-
-       // exponentiatorOfNegativeLogField->SetInput( log_field ); //TODO: convert to negative of log_field
-       // exponentiatorOfNegativeLogField->UpdateLargestPossibleRegion();
-       m_Multiplier->SetInput( log_field );
-       //m_Multiplier->GraftOutput( update ); //debugging
-       m_Multiplier->Update();
-       exponentiatorOfNegativeLogField->SetInput( m_Multiplier->GetOutput() ); //TODO: check this is negative of log_field
-       inv_field = exponentiatorOfNegativeLogField->GetOutput();
-       jacdetfilter->SetInput( field );
-       jacdetfilter->SetUseImageSpacing( false );
-       jacdetfilter->UpdateLargestPossibleRegion();
-       jacobianimage = jacdetfilter->GetOutput();
-       minmaxfilter->SetImage( jacobianimage );
-       minmaxfilter->Compute();
-       std::cout<<"Minimum of the determinant of the Jacobian of the warp: " <<minmaxfilter->GetMinimum()<<std::endl;
-       std::cout<<"Maximum of the determinant of the Jacobian of the warp: " <<minmaxfilter->GetMaximum()<<std::endl;
-
-      /*Debug*/
-      // try
-      // {
-      //   typedef itk::ImageFileWriter< DeformationFieldType>  FieldWriterType;
-      //   typename FieldWriterType::Pointer      fieldwriter =  FieldWriterType::New();
-      //   fieldwriter->SetUseCompression( true );
-      //   fieldwriter->SetFileName( "field.nii.gz" );
-      //   fieldwriter->SetInput( field  );
-      //   fieldwriter->Update();
-      //   fieldwriter->SetFileName( "inv_field.nii.gz" );
-      //   fieldwriter->SetInput( inv_field );
-      //   fieldwriter->Update();
-      // }
-      // catch( itk::ExceptionObject& err )
-      // {
-      //    std::cout << "Unexpected error." << std::endl;
-      //    std::cout << err << std::endl;
-      //    exit( EXIT_FAILURE );
-      // }
-      // exit(0);
-     /*End Debug*/
-
-
-       /**Debug**/
-       //typedef itk::MinimumMaximumImageCalculator<DeformationFieldType> MinMaxFilterType2;
-       //typename MinMaxFilterType2::Pointer minmaxfilter2 = MinMaxFilterType2::New();
-       //minmaxfilter2->SetImage( m_Multiplier->GetOutput() );
-       //minmaxfilter2->Compute();
-       //std::cout<<"Minimum of the inv_field: " <<minmaxfilter2->GetMinimum()<<std::endl;
-       //std::cout<<"Maximum of the inv_field: " <<minmaxfilter2->GetMaximum()<<std::endl;
-
-       //minmaxfilter2->SetImage( log_field );
-       //minmaxfilter2->Compute();
-       //std::cout<<"Minimum of the log_field: " <<minmaxfilter2->GetMinimum()<<std::endl;
-       //std::cout<<"Maximum of the log_field: " <<minmaxfilter2->GetMaximum()<<std::endl;
-
-       /**End Debug**/
-
-       drfp->SetDeformationField( field );
-       drfp->SetInvDeformationField( inv_field );
-       drfp->SetFixedImage( fixedImageReader->GetOutput() );
-       drfp->SetMovingImage( movingImageReader->GetOutput() );
-       if (useJacFlag > 0)
-       {
-         drfp->SetUseJacobian(true);
-         drfp->SetJacobianDetImage(jacobianimage);
-       }
-       else
-       {
-         drfp->SetUseJacobian(false);
-       }
-       drfp->InitializeIteration();
-
-       const itk::Size<Dimension> radius = drfp->GetRadius();
-
-       // Break the input into a series of regions.  The first region is free
-       // of boundary conditions, the rest with boundary conditions.  We operate
-       // on the output region because input has been copied to output.
-       typedef itk::NeighborhoodAlgorithm::ImageBoundaryFacesCalculator <DeformationFieldType> FaceCalculatorType;
-       typedef typename FaceCalculatorType::FaceListType FaceListType;
-       typedef typename DemonsRegistrationFunctionType::NeighborhoodType NeighborhoodIteratorType;
-       typedef itk::ImageRegionIterator<DeformationFieldType> UpdateIteratorType;
-
-       FaceCalculatorType faceCalculator;
-
-       FaceListType faceList = faceCalculator(field, region, radius);
-       typename FaceListType::iterator fIt = faceList.begin();
-
-       // Ask the function object for a pointer to a data structure it
-       // will use to manage any global values it needs.  We'll pass this
-       // back to the function object at each calculation and then
-       // again so that the function object can use it to determine a
-       // time step for this iteration.
-       void * globalData = drfp->GetGlobalDataPointer();
-
-       // Process the non-boundary region.
-       NeighborhoodIteratorType nD(radius,field, *fIt);
-       UpdateIteratorType       nU(update,  *fIt);
-       nD.GoToBegin();
-       while( !nD.IsAtEnd() )
-       {
-         nU.Value() = drfp->ComputeUpdate(nD, globalData);
-         ++nD;
-         ++nU;
-       }
-
-       // Process each of the boundary faces.
-       NeighborhoodIteratorType bD;
-       UpdateIteratorType   bU;
-       for (++fIt; fIt != faceList.end(); ++fIt)
-       {
-         bD = NeighborhoodIteratorType(radius,field, *fIt);
-         bU = UpdateIteratorType(update, *fIt);
-
-         bD.GoToBegin();
-         bU.GoToBegin();
-         while ( !bD.IsAtEnd() )
-         {
-           bU.Value() = drfp->ComputeUpdate(bD, globalData);
-           ++bD;
-           ++bU;
-         }
-       }
-       // Ask the finite difference function to compute the time step for
-       // this iteration.  We give it the global data pointer to use, then
-       // ask it to free the global data memory.
-       //timeStep = df->ComputeGlobalTimeStep(globalData);
-       drfp->ReleaseGlobalDataPointer(globalData);
-
-
-       // Warp the image  (In MATLAB: warped_mov_im = warpimage(mov_im, def_x, def_y, def_z);)
-       warper->SetInput( movingImageReader->GetOutput() );
-       warper->SetOutputSpacing( spacing );
-       warper->SetOutputOrigin( origin );
-       //warper->SetOutputSpacing( fixedimage->GetSpacing() );
-       //warper->SetOutputOrigin( fixedimage->GetOrigin() );
-       //warper->SetDeformationField( exponentiatorOfLogField->GetOutput() );
-       //warper->SetDeformationField( update );
-       warper->SetDeformationField( field );
-       if ( std::numeric_limits<PixelType>::has_quiet_NaN )
-       {
-         warper->SetEdgePaddingValue( std::numeric_limits<PixelType>::quiet_NaN() );
-       }
-       warper->UpdateLargestPossibleRegion();
-       warper->Update();
-
-       // Calculate MSE
-       double finalSSD = 0.0;
-       typedef itk::ImageRegionConstIterator<ImageType> ImageConstIterator;
-       ImageConstIterator iterfix = ImageConstIterator( fixedimage, fixedimage->GetRequestedRegion() );
-       ImageConstIterator itermovwarp = ImageConstIterator( warper->GetOutput(), fixedimage->GetRequestedRegion() );
-       for (iterfix.GoToBegin(), itermovwarp.GoToBegin(); !iterfix.IsAtEnd(); ++iterfix, ++itermovwarp)
-       {
-         if (iterfix.Get() == iterfix.Get() && itermovwarp.Get() == itermovwarp.Get())
-           finalSSD += vnl_math_sqr( iterfix.Get() - itermovwarp.Get() );
-       }
-       const double finalMSE = finalSSD / static_cast<double>( fixedimage->GetRequestedRegion().GetNumberOfPixels() );
-       mse[i] = finalMSE;
-       std::cout<<"****MSE fixed image vs. warped moving image: "<<finalMSE<<std::endl;
-
-
-       // Smooth update
-       //double var[Dimension];
-       //for (unsigned int i=0; i<Dimension; ++i)
-       //  var[i] = 0.6;
-       //typedef itk::SmoothingRecursiveGaussianImageFilter<DeformationFieldType,DeformationFieldType> GaussianFilterType;
-       //typename GaussianFilterType::Pointer smoother = GaussianFilterType::New();
-       //smoother->SetInput( update );
-       //smoother->SetSigma( 0.6 ); //TODO change this
-       //smoother->Update();
-
-
-       // Update deformation field
-       typedef itk::AddImageFilter< DeformationFieldType, DeformationFieldType, DeformationFieldType > AddFilterType;
-       typename AddFilterType::Pointer addFilter = AddFilterType::New();
-       addFilter->SetInput1( log_field );
-       //addFilter->SetInput2( smoother->GetOutput() );
-       addFilter->SetInput2( update );
-       try
-       {
-         addFilter->Update();
-       }
-       catch( itk::ExceptionObject & err )
-       {
-         std::cout << "ExceptionObject caught !" << std::endl;
-         std::cout << err << std::endl;
-         exit( EXIT_FAILURE );
-       }
-       log_field = addFilter->GetOutput();
-
-       // Test add images (works)
-       /*typedef itk::AddImageFilter< ImageType, ImageType, ImageType > AddImageFilterType;
-         typename AddImageFilterType::Pointer addImageFilter = AddImageFilterType::New();
-         addImageFilter->SetInput1( movingImageReader->GetOutput() );
-       //addFilter->SetInput2( smoother->GetOutput() );
-       addImageFilter->SetInput2( warper->GetOutput() );
-       try
-       {
-       addImageFilter->Update();
-       }
-       catch( itk::ExceptionObject & err )
-       {
-       std::cout << "ExceptionObject caught !" << std::endl;
-       std::cout << err << std::endl;
-       exit( EXIT_FAILURE );
-       }*/
-
-       if ( i > 1)
-       {
-         if (mse[i] > mse[i - 1])
-           strike++;
-       }
-
-       if (strike > 3)
-         break;
-     }
-     //end for options.numiter
-     
-  // Write image
-     // typedef itk::ImageFileWriter< ImageType >  WriterType;
-    // typename WriterType::Pointer      writer =  WriterType::New();
-    writer->SetFileName( outputVolume );
-    //writer->SetInput( movingImageReader->GetOutput()  );
-    writer->SetInput( warper->GetOutput()  );
-    writer->SetUseCompression( true );
+    typename ImageReaderType::Pointer imageReader2 = ImageReaderType::New();
+    // imageReader2->SetFileName( args.outputImageFile.c_str() );
+    imageReader2->SetFileName(template_name.str());
     try
     {
-       writer->Update();
+      imageReader2->Update();
     }
     catch( itk::ExceptionObject& err )
     {
-       std::cout << "Unexpected error." << std::endl;
-       std::cout << err << std::endl;
-       exit( EXIT_FAILURE );
+      std::cout << "Could not read one of the input images." << std::endl;
+      std::cout << err << std::endl;
+      exit( EXIT_FAILURE );
+    }
+    typename ImageType::Pointer                  template_vol = 0;
+    template_vol = imageReader2->GetOutput();
+
+    for (unsigned int i = 0; i < args.volumeFileNames.size(); ++i)
+    {
+      /*
+       * Load the image volume
+       */
+      imageReader->SetFileName( args.volumeFileNames[i] );
+      try
+      {
+        imageReader->Update();
+      }
+      catch( itk::ExceptionObject& err )
+      {
+        std::cout << "Could not read one of the input images." << std::endl;
+        std::cout << err << std::endl;
+        exit( EXIT_FAILURE );
+      }
+
+      /* 
+       * Set up the demons filter 
+       */
+      typedef typename itk::DiffeomorphicDemonsRegistrationFilter < ImageType, ImageType, DeformationFieldType>   ActualRegistrationFilterType;
+      typename DemonsRegistrationFunctionType::GradientType gtype = DemonsRegistrationFunctionType::Symmetric;
+      typename ActualRegistrationFilterType::Pointer filter = ActualRegistrationFilterType::New();
+      filter->SetMaximumUpdateStepLength( 1e1 ); //TODO: check this //filter->SetMaximumUpdateStepLength( args.maxStepLength );
+      filter->SetUseGradientType( gtype ); //TODO: check this.  filter->SetUseGradientType( static_cast<GradientType>(args.gradientType) );
+      if ( args.sigmaDef > 0.1 )
+      {
+        filter->SmoothDeformationFieldOn();
+        filter->SetStandardDeviations( args.sigmaDef );
+      }
+      else
+        filter->SmoothDeformationFieldOff();
+
+      if ( args.sigmaUp > 0.1 )
+      {
+        filter->SmoothUpdateFieldOn();
+        filter->SetUpdateFieldStandardDeviations( args.sigmaUp );
+      }
+      else
+        filter->SmoothUpdateFieldOff();
+
+      if ( args.verbosity > 0 )
+      {      
+        typename CommandIterationUpdate<PixelType, Dimension>::Pointer observer = CommandIterationUpdate<PixelType, Dimension>::New();
+        filter->AddObserver( itk::IterationEvent(), observer );
+      }
+      // filter->SetInitialDeformationField( deformationReader->GetOutput() );
+
+      /* 
+       * Set up the multi-resolution filter and compute the deformation field
+       */ 
+      typedef typename itk::MultiResolutionPDEDeformableRegistration2< ImageType, ImageType, DeformationFieldType, PixelType >   MultiResRegistrationFilterType;
+      typename MultiResRegistrationFilterType::Pointer multires = MultiResRegistrationFilterType::New();
+      multires->SetRegistrationFilter( filter );
+      multires->SetNumberOfLevels( args.numLevels );
+      std::vector<unsigned int> numIterationsVector= std::vector<unsigned int>(args.numLevels, args.numIterations);
+      multires->SetNumberOfIterations( &numIterationsVector[0]); // multires->SetNumberOfIterations( &args.numIterations[0] );
+      multires->SetFixedImage( template_vol );
+      multires->SetMovingImage( imageReader->GetOutput() );
+      if ( args.verbosity > 0 )
+      {
+        typename CommandIterationUpdate<PixelType, Dimension>::Pointer multiresobserver = CommandIterationUpdate<PixelType, Dimension>::New();
+        multires->AddObserver( itk::IterationEvent(), multiresobserver );
+      }
+      try
+      {
+        multires->UpdateLargestPossibleRegion();
+      }
+      catch( itk::ExceptionObject& err )
+      {
+        std::cout << "Unexpected error." << std::endl;
+        std::cout << err << std::endl;
+        exit( EXIT_FAILURE );
+      }
+      typename DeformationFieldType::Pointer defField = 0;
+      defField = multires->GetOutput();
+      defField->DisconnectPipeline();
+
+      /* 
+       * Save the deformation field 
+       */
+      deformation_name.str("");
+      deformation_name << args.volumeFileNames[i] << "_" << j << "_" "deformation.nii.gz";
+      typename DeformationWriterType::Pointer  defWriter =  DeformationWriterType::New();
+      defWriter->SetFileName( deformation_name.str() );
+      defWriter->SetInput( defField  );
+      defWriter->SetUseCompression( true );
+      try
+      {
+        defWriter->Update();
+      }
+      catch( itk::ExceptionObject& err )
+      {
+        std::cout << "Unexpected error." << std::endl;
+        std::cout << err << std::endl;
+        exit( EXIT_FAILURE );
+      }
     }
 
+    /*
+     * Renormalize the warps TODO
+     */
+    // if (renormalize_warps_flag)
+    //     renormalize_warps(SBJ_CELL, Output_dir, CurTemplateWarpName);
+    // end
+
+    /*
+     * Compute the new template
+     */
+    ComputeTemplate<ImageType, DeformationFieldType>(args, j+1, true);
   }
+  
+
+  
+
+  //}//end for mem allocations
+
+}
 
 }
 

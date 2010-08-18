@@ -58,28 +58,71 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
     itkExceptionMacro(<<"FiniteDifferenceFunction not of type DemonsRegistrationFunctionType");
     }
 
-  f->SetDeformationField( this->GetDeformationField() );
-  f->SetInvDeformationField( this->GetDeformationField() );
-
+  //DEBUG
   if (this->GetInvDeformationField() == NULL)
-    f->SetInvDeformationField( this->GetDeformationField() );
+  {
+    this->SetInvDeformationField( this->GetDeformationField() );
+    f->SetInvDeformationField( this->GetInvDeformationField() );  //should be zeros
+
+    if (this->GetDeformationField() == NULL)
+      std::cout << "  InitializeIteration: GetDeformationField is NULL!" << std::endl;
+
+    std::cout << "  ************************************************" << std::endl;
+    std::cout << "  InitializeIteration: GetInvDeformationField is NULL" << std::endl;
+    std::cout << "  ************************************************" << std::endl;
+    /*Debug*/
+      try
+      {
+        typedef itk::ImageFileWriter< DeformationFieldType>  FieldWriterType;
+        typename FieldWriterType::Pointer      fieldwriter =  FieldWriterType::New();
+        fieldwriter->SetUseCompression( true );
+        fieldwriter->SetFileName( "invdeformation-initial.nii.gz" );
+        fieldwriter->SetInput( this->GetInvDeformationField()  );
+        fieldwriter->Update();
+      }
+      catch( itk::ExceptionObject& err )
+      {
+         std::cout << "Unexpected error." << std::endl;
+         std::cout << err << std::endl;
+         exit( EXIT_FAILURE );
+      }
+      // exit(0);
+     /*End Debug*/
+
+  }
   else
   {
     f->SetInvDeformationField( this->GetInvDeformationField() );
-    std::cout << "inv deformation origin: " << this->GetInvDeformationField()->GetOrigin() << std::endl;
-    std::cout << "inv deformation size: " << this->GetInvDeformationField()->GetLargestPossibleRegion().GetSize()[0] << " " << 
-        this->GetInvDeformationField()->GetLargestPossibleRegion().GetSize()[1] << " " <<
-        this->GetInvDeformationField()->GetLargestPossibleRegion().GetSize()[2] << std::endl;
+      /*Debug*/
+      try
+      {
+        typedef itk::ImageFileWriter< DeformationFieldType>  FieldWriterType;
+        typename FieldWriterType::Pointer      fieldwriter =  FieldWriterType::New();
+        fieldwriter->SetUseCompression( true );
+        fieldwriter->SetFileName( "invdeformation.nii.gz" );
+        fieldwriter->SetInput( this->GetInvDeformationField()  );
+        fieldwriter->Update();
+        fieldwriter->SetFileName( "deformation.nii.gz" );
+        fieldwriter->SetInput( this->GetDeformationField()  );
+        fieldwriter->Update();
+      }
+      catch( itk::ExceptionObject& err )
+      {
+         std::cout << "Unexpected error." << std::endl;
+         std::cout << err << std::endl;
+         exit( EXIT_FAILURE );
+      }
+      // exit(0);
+     /*End Debug*/
+
   }
+
+  f->SetDeformationField( this->GetDeformationField() );
 
   // call the superclass  implementation ( initializes f )
   Superclass::InitializeIteration();
-  
-  // std::cout << "DiffeomorphicDemonsRegistrationFilter:InitializeIteration: output size: " << this->GetOutput()->GetLargestPossibleRegion().GetSize()[0] << std::endl;
-  // std::cout << "DiffeomorphicDemonsRegistrationFilter:InitializeIteration: output size: " << this->GetOutput()->GetLargestPossibleRegion().GetSize()[1] << std::endl;
-  // std::cout << "DiffeomorphicDemonsRegistrationFilter:InitializeIteration: output size: " << this->GetOutput()->GetLargestPossibleRegion().GetSize()[2] << std::endl;
-  // std::cout << "DiffeomorphicDemonsRegistrationFilter:InitializeIteration(): leaving" << std::endl;
-}
+
+ }
 
 
 /*
@@ -308,9 +351,37 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
      this->GetUpdateBuffer()->Graft( m_Multiplier->GetOutput() );
   }
 
+  /*
+   * Update the inverse deformation field
+   */
+  m_Multiplier->SetConstant( -1 );
+  m_Multiplier->SetInput( this->GetUpdateBuffer() );
+  // m_Multiplier->UpdateLargestPossibleRegion();
+  m_Multiplier->Update();
+  m_Exponentiator->SetInput( m_Multiplier->GetOutput() );
+
+  m_Warper->SetOutputSpacing( this->GetDeformationField()->GetSpacing() );
+  m_Warper->SetOutputOrigin( this->GetDeformationField()->GetOrigin() );
+  m_Warper->SetInput( this->GetInvDeformationField() );
+  m_Warper->SetDeformationField( m_Exponentiator->GetOutput() );
+  m_Adder->SetInput1( m_Warper->GetOutput() );
+  m_Adder->SetInput2( m_Exponentiator->GetOutput() );
+  m_Adder->GetOutput()->SetRequestedRegion( this->GetInvDeformationField()->GetRequestedRegion() );
+  m_Adder->Update();
+  this->SetInvDeformationField( m_Adder->GetOutput() );
+
+  // Smooth the *inverse* field
+  if ( this->GetSmoothDeformationField() )
+  {
+    this->GraftOutput( this->GetInvDeformationField() );
+    this->SmoothDeformationField();
+  }
 
 
-  // compute the exponential
+
+  /*
+   * Update the deformation field
+   */
   m_Exponentiator->SetInput( this->GetUpdateBuffer() );
   const double imposedMaxUpStep = this->GetMaximumUpdateStepLength();
   if ( imposedMaxUpStep > 0.0 )
@@ -346,7 +417,6 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
   m_Adder->GetOutput()->SetRequestedRegion( this->GetOutput()->GetRequestedRegion() );
   m_Adder->Update();
 
-  
   //std::cout<<"out buff spac: "<<this->GetOutput()->GetSpacing()<<std::endl;
   //std::cout<<"up buff spac: "<<this->GetUpdateBuffer()->GetSpacing()<<std::endl;
   //std::cout<<"exp out spac: "<<m_Exponentiator->GetOutput()->GetSpacing()<<std::endl;
@@ -370,59 +440,10 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
 
   this->SetRMSChange( drfp->GetRMSChange() );
 
-  /*
-   * Smooth the deformation field
-   */
+  // Smooth the deformation field
   if ( this->GetSmoothDeformationField() )
   {
      this->SmoothDeformationField();
-
-     //double var[DeformationFieldType::ImageDimension];
-     //for (unsigned int i=0; i<DeformationFieldType::ImageDimension; ++i)
-     //   var[i] = vnl_math_sqr( this->GetUpdateFieldStandardDeviations()[i] );
-        
-     //typedef SmoothingRecursiveGaussianImageFilter<DeformationFieldType,DeformationFieldType> GaussianFilterType;
-     //typename GaussianFilterType::Pointer smoother = GaussianFilterType::New();
-     //smoother->SetInput( this->GetOutput() );
-     //smoother->SetVariance( var );
-     //smoother->SetSigma( this->GetUpdateFieldStandardDeviations()[0] );
-     //smoother->Update();
-
-     //this->GraftOutput( smoother->GetOutput() );
-
-  }
-
-  std::cout << "itkDiffeomorphicDemonsRegistrationFilter::ApplyUpdate: Updating the inverse deformation field " << this->GetUpdateBuffer()->GetLargestPossibleRegion().GetSize()[0] << std::endl;
-  // Update the inverse deformation field
-    // std::cout << "itkDiffeomorphicDemonsRegistrationFilter::ApplyUpdate: update buffer size: " << this->GetUpdateBuffer()->GetLargestPossibleRegion().GetSize()[0] << std::endl;
-    // std::cout << "itkDiffeomorphicDemonsRegistrationFilter::ApplyUpdate: update buffer size: " << this->GetUpdateBuffer()->GetLargestPossibleRegion().GetSize()[1] << std::endl;
-    // std::cout << "itkDiffeomorphicDemonsRegistrationFilter::ApplyUpdate: update buffer size: " << this->GetUpdateBuffer()->GetLargestPossibleRegion().GetSize()[2] << std::endl;
-    m_Multiplier->SetConstant( -1 );
-    m_Multiplier->SetInput( this->GetUpdateBuffer() );
-    // m_Multiplier->UpdateLargestPossibleRegion();
-    m_Multiplier->Update();
-    // std::cout << "itkDiffeomorphicDemonsRegistrationFilter::ApplyUpdate:multiplier output size: " << m_Multiplier->GetOutput()->GetLargestPossibleRegion().GetSize()[0] << std::endl;
-    // std::cout << "itkDiffeomorphicDemonsRegistrationFilter::ApplyUpdate:multiplier output size: " << m_Multiplier->GetOutput()->GetLargestPossibleRegion().GetSize()[1] << std::endl;
-    // std::cout << "itkDiffeomorphicDemonsRegistrationFilter::ApplyUpdate:multiplier output size: " << m_Multiplier->GetOutput()->GetLargestPossibleRegion().GetSize()[2] << std::endl;
-  m_Exponentiator->SetInput( m_Multiplier->GetOutput() );
-  if (this->GetInvDeformationField() == NULL)
-  {
-    // std::cout << "apply update: Inv deformation is null" << std::endl;
-    // this->SetInvDeformationField(this->GetDeformationField());
-    this->SetInvDeformationField(m_Exponentiator->GetOutput());
-  }
-  else
-  {
-    m_Warper->SetOutputSpacing( this->GetDeformationField()->GetSpacing() );
-    m_Warper->SetOutputOrigin( this->GetDeformationField()->GetOrigin() );
-    std::cout << "in here" << std::endl;
-    m_Warper->SetInput( this->GetInvDeformationField() );
-    m_Warper->SetDeformationField( m_Exponentiator->GetOutput() );
-    m_Adder->SetInput1( m_Warper->GetOutput() );
-    m_Adder->SetInput2( m_Exponentiator->GetOutput() );
-    // m_Adder->GetOutput()->SetRequestedRegion( this->GetInvDeformationField()->GetRequestedRegion() );
-    m_Adder->Update();
-    this->SetInvDeformationField( m_Adder->GetOutput() );
   }
 
 
