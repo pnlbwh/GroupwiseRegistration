@@ -112,7 +112,6 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
          std::cout << err << std::endl;
          exit( EXIT_FAILURE );
       }
-      // exit(0);
      /*End Debug*/
 
   }
@@ -375,6 +374,7 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
   {
     this->GraftOutput( this->GetInvDeformationField() );
     this->SmoothDeformationField();
+    m_Adder->GraftOutput(this->GetOutput() );
   }
 
 

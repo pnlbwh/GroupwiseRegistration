@@ -497,7 +497,7 @@ void ComputeTemplate( arguments args, int iter, bool useWarps )
         weight->FillBuffer( 0.0 );
       }
       std::stringstream deformation_name;
-      deformation_name << args.volumeFileNames[i] << "_" << iter-1 << "_" "deformation.nii.gz";
+      deformation_name << args.volumeFileNames[i] << "_" << iter-1 << "_deformation.nii.gz";
       defFieldReader->SetFileName( deformation_name.str() );
       // defFieldReader->SetFileName( args.volumeFileNames[i] + "-deformation.nii.gz");
       try
@@ -516,6 +516,21 @@ void ComputeTemplate( arguments args, int iter, bool useWarps )
       warper->SetOutputDirection( image->GetDirection() );
       warper->SetDeformationField( defFieldReader->GetOutput() );
       image = warper->GetOutput();
+      std::stringstream warped_image_name;
+      warped_image_name << args.volumeFileNames[i] << "_" << iter-1 << "_warped.nii.gz";
+      writer->SetFileName( warped_image_name.str() );
+      writer->SetUseCompression( true );
+      writer->SetInput( image );
+      try
+      {
+        writer->Update();
+      }
+      catch( itk::ExceptionObject& err )
+      {
+        std::cout << "Could not write warped image to disk." << std::endl;
+        std::cout << err << std::endl;
+        exit( EXIT_FAILURE );
+      }
 
       jacdetfilter->SetInput( defFieldReader->GetOutput() );
       jacdetfilter->SetUseImageSpacing( false );
@@ -594,20 +609,6 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
 
   //{//for mem allocations
 
-  // typename DeformationReaderType::Pointer deformationReader  = DeformationReaderType::New();
-  // deformationReader->SetFileName( "deformation.nii.gz" );
-  // try
-  // {
-  //   deformationReader->Update();
-  // }
-  // catch( itk::ExceptionObject& err )
-  // {
-  //   std::cout << "Could not read the input deformatoin field." << std::endl;
-  //   std::cout << err << std::endl;
-  //   exit( EXIT_FAILURE );
-  // }
-
-
   /*
    * Compute the template
    */
@@ -661,12 +662,13 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
       }
 
       /* 
-       * Set up the demons filter 
+       * Create the demons filter 
        */
       typedef typename itk::DiffeomorphicDemonsRegistrationFilter < ImageType, ImageType, DeformationFieldType>   ActualRegistrationFilterType;
       typename DemonsRegistrationFunctionType::GradientType gtype = DemonsRegistrationFunctionType::Symmetric;
       typename ActualRegistrationFilterType::Pointer filter = ActualRegistrationFilterType::New();
-      filter->SetMaximumUpdateStepLength( 1e1 ); //TODO: check this //filter->SetMaximumUpdateStepLength( args.maxStepLength );
+      // filter->SetMaximumUpdateStepLength( 1e1 ); //TODO: check this //filter->SetMaximumUpdateStepLength( args.maxStepLength );
+      filter->SetMaximumUpdateStepLength( 100 ); //TODO: check this //filter->SetMaximumUpdateStepLength( args.maxStepLength );
       filter->SetUseGradientType( gtype ); //TODO: check this.  filter->SetUseGradientType( static_cast<GradientType>(args.gradientType) );
       if ( args.sigmaDef > 0.1 )
       {
@@ -828,3 +830,54 @@ int main( int argc, char * argv[] )
 
   return EXIT_SUCCESS;
 }
+
+
+  // std::stringstream warped_image_name;
+  // warped_image_name << args.volumeFileNames[0] << "_" << "4" << "_warped.nii.gz";
+  // typename ImageReaderType::Pointer reader = ImageReaderType::New();
+  // reader->SetFileName(warped_image_name.str());
+  // try
+  // {
+  //   reader->Update();
+  // }
+  // catch( itk::ExceptionObject& err )
+  // {
+  //   std::cout << "Could not read warped image." << std::endl;
+  //   std::cout << err << std::endl;
+  //   exit( EXIT_FAILURE );
+  // }
+  // warped_image_name.str("");
+  // warped_image_name << args.volumeFileNames[1] << "_" << "4" << "_warped.nii.gz";
+  // typename ImageReaderType::Pointer reader2 = ImageReaderType::New();
+  // reader2->SetFileName(warped_image_name.str());
+  // try
+  // {
+  //   reader2->Update();
+  // }
+  // catch( itk::ExceptionObject& err )
+  // {
+  //   std::cout << "Could not read warped image." << std::endl;
+  //   std::cout << err << std::endl;
+  //   exit( EXIT_FAILURE );
+  // }
+
+  // typedef itk::AddImageFilter<ImageType, ImageType, ImageType> AdderType;
+  // typename AdderType::Pointer               adder = AdderType::New();
+  // adder->SetInput1( reader->GetOutput() );
+  // adder->SetInput2( reader2->GetOutput() );
+  // adder->Update();
+  //     writer->SetFileName( "test_template.nii.gz" );
+  //     writer->SetInput( adder->GetOutput()  );
+  //     writer->SetUseCompression( true );
+  //     try
+  //     {
+  //       writer->Update();
+  //     }
+  //     catch( itk::ExceptionObject& err )
+  //     {
+  //       std::cout << "Unexpected error." << std::endl;
+  //       std::cout << err << std::endl;
+  //       exit( EXIT_FAILURE );
+  //     }
+  //     exit(0);
+

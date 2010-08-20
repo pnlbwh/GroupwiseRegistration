@@ -146,6 +146,7 @@ public:
 
   typedef typename DeformationFieldType::Pointer   DeformationFieldTypePointer;
 
+
   DeformationFieldTypePointer m_invDeformationField;
 
   void SetInvDeformationField(  DeformationFieldTypePointer ptr )
@@ -153,6 +154,16 @@ public:
 
   DeformationFieldType * GetInvDeformationField(void)
   { return m_invDeformationField; }
+
+
+  DeformationFieldTypePointer m_logDeformationField;
+
+  void SetLogDeformationField(  DeformationFieldTypePointer ptr )
+  { m_logDeformationField = ptr; }
+
+  DeformationFieldType * GetLogDeformationField(void)
+  { return m_logDeformationField; }
+
 
 protected:
   DiffeomorphicDemonsRegistrationFilter();
