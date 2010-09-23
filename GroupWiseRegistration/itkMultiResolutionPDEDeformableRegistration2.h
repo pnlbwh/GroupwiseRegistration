@@ -8,6 +8,8 @@
 #include "itkMultiResolutionPyramidImageFilter.h"
 #include "itkVectorResampleImageFilter.h"
 
+#include "itkDiffeomorphicDemonsRegistrationFilter.h"
+
 #include <vector>
 
 namespace itk
@@ -104,13 +106,25 @@ public:
   typedef Image<TRealType,itkGetStaticConstMacro(ImageDimension)> FloatImageType;
 
   /** The internal registration type. */
-  typedef PDEDeformableRegistrationFilter<
+  // typedef PDEDeformableRegistrationFilter<
+  //   FloatImageType, FloatImageType, DeformationFieldType > RegistrationType;
+  // typedef typename RegistrationType::Pointer RegistrationPointer;
+  
+  typedef DiffeomorphicDemonsRegistrationFilter<
     FloatImageType, FloatImageType, DeformationFieldType > RegistrationType;
   typedef typename RegistrationType::Pointer RegistrationPointer;
 
-  /** The default registration type. */
-  typedef DemonsRegistrationFilter<
+  /** The default registration type. */ 
+  typedef DiffeomorphicDemonsRegistrationFilter<
     FloatImageType, FloatImageType, DeformationFieldType > DefaultRegistrationType;
+
+  /** Designed to be used with this internal registration type. */
+  // typedef DiffeomorphicDemonsRegistrationFilter<
+  //   FloatImageType, FloatImageType, DeformationFieldType > DiffeomorphicRegistrationType;
+
+  /** The default registration type. */ 
+  // typedef DemonsRegistrationFilter<
+  //   FloatImageType, FloatImageType, DeformationFieldType > DefaultRegistrationType;
 
   /** The fixed multi-resolution image pyramid type. */
   typedef MultiResolutionPyramidImageFilter<

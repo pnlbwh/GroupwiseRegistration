@@ -243,6 +243,7 @@ MultiResolutionPDEDeformableRegistration2<TFixedImage,TMovingImage,TDeformationF
     (int) m_FixedImagePyramid->GetNumberOfLevels() );
 
   DeformationFieldPointer tempField = NULL;
+  DeformationFieldPointer tempInvField = NULL;
   bool lastShrinkFactorsAllOnes = false;
 
   while ( !this->Halt() )
@@ -268,11 +269,11 @@ MultiResolutionPDEDeformableRegistration2<TFixedImage,TMovingImage,TDeformationF
       m_FieldExpander->SetOutputOrigin( fi->GetOrigin() );
       m_FieldExpander->SetOutputSpacing( fi->GetSpacing());
 
-    std::cout << "---------------------" << std::endl;
-    std::cout << "m_FieldExpander size: " << m_FieldExpander->GetSize()[0] << std::endl;
-    std::cout << "m_FieldExpander size: " << m_FieldExpander->GetSize()[1] << std::endl;
-    std::cout << "m_FieldExpander size: " << m_FieldExpander->GetSize()[2] << std::endl;
-    std::cout << "---------------------" << std::endl;
+      std::cout << "---------------------" << std::endl;
+      std::cout << "m_FieldExpander size: " << m_FieldExpander->GetSize()[0] << std::endl;
+      std::cout << "m_FieldExpander size: " << m_FieldExpander->GetSize()[1] << std::endl;
+      std::cout << "m_FieldExpander size: " << m_FieldExpander->GetSize()[2] << std::endl;
+      std::cout << "---------------------" << std::endl;
 
       m_FieldExpander->UpdateLargestPossibleRegion();
       m_FieldExpander->SetInput( NULL );
@@ -280,6 +281,21 @@ MultiResolutionPDEDeformableRegistration2<TFixedImage,TMovingImage,TDeformationF
       tempField->DisconnectPipeline();
 
       m_RegistrationFilter->SetInitialDeformationField( tempField );
+
+      // if (dynamic_cast<DiffeomorphicRegistrationType>( m_RegistrationFilter ))
+      // {
+        /*
+         * Resample the inverse field
+         */
+        m_FieldExpander->SetInput( tempInvField );
+        m_FieldExpander->UpdateLargestPossibleRegion();
+        m_FieldExpander->SetInput( NULL );
+        tempInvField = m_FieldExpander->GetOutput();
+        tempInvField->DisconnectPipeline();
+
+        m_RegistrationFilter->SetInvDeformationField( tempInvField );
+      // }
+
 
       }
 
@@ -305,6 +321,12 @@ MultiResolutionPDEDeformableRegistration2<TFixedImage,TMovingImage,TDeformationF
     m_RegistrationFilter->UpdateLargestPossibleRegion();
     tempField = m_RegistrationFilter->GetOutput();
     tempField->DisconnectPipeline();
+
+    // if (dynamic_cast<DiffeomorphicRegistrationType>( m_RegistrationFilter ))
+    // {
+      tempInvField = m_RegistrationFilter->GetInvDeformationField();
+      tempInvField->DisconnectPipeline();
+    // }
 
     // Increment level counter.  
     m_CurrentLevel++;

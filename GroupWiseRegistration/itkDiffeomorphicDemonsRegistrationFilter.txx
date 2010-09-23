@@ -13,15 +13,17 @@ template <class TFixedImage, class TMovingImage, class TDeformationField>
 DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField>
 ::DiffeomorphicDemonsRegistrationFilter()
 {
- 
   typename DemonsRegistrationFunctionType::Pointer drfp;
   drfp = DemonsRegistrationFunctionType::New();
+  // drfp->SetRegWeight(this->GetRegWeight());
+  // drfp->SetRegWeight(0.1); //inverse error
+  drfp->SetRegWeight(1.0);
+  // std::cout << "Reg Weight is " << this->GetRegWeight() << std::endl;
 
-  this->SetDifferenceFunction( static_cast<FiniteDifferenceFunctionType *>(
-                                 drfp.GetPointer() ) );
+  this->SetDifferenceFunction( static_cast<FiniteDifferenceFunctionType *>( drfp.GetPointer() ) );
 
   m_Multiplier = MultiplyByConstantType::New();
-  // m_Multiplier->InPlaceOn();
+  // m_Multiplier->InPlaceOn();  //This was breaking the code in ApplyUpdate(...)
 
   m_Exponentiator = FieldExponentiatorType::New();
   
@@ -33,6 +35,7 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
   m_Adder = AdderType::New();
   m_Adder->InPlaceOn();
 
+  /* Set the inverse deformation field to null */
   this->SetInvDeformationField(NULL);
 }
 
@@ -54,74 +57,48 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
     (this->GetDifferenceFunction().GetPointer());
 
   if ( !f )
-    {
+  {
     itkExceptionMacro(<<"FiniteDifferenceFunction not of type DemonsRegistrationFunctionType");
-    }
+  }
 
-  //DEBUG
+  /* Initialize the inverse deformation field as zeros */
   if (this->GetInvDeformationField() == NULL)
   {
-    this->SetInvDeformationField( this->GetDeformationField() );
-    f->SetInvDeformationField( this->GetInvDeformationField() );  //should be zeros
-
-    if (this->GetDeformationField() == NULL)
-      std::cout << "  InitializeIteration: GetDeformationField is NULL!" << std::endl;
-
-    std::cout << "  ************************************************" << std::endl;
-    std::cout << "  InitializeIteration: GetInvDeformationField is NULL" << std::endl;
-    std::cout << "  ************************************************" << std::endl;
-    /*Debug*/
-      try
-      {
-        typedef itk::ImageFileWriter< DeformationFieldType>  FieldWriterType;
-        typename FieldWriterType::Pointer      fieldwriter =  FieldWriterType::New();
-        fieldwriter->SetUseCompression( true );
-        fieldwriter->SetFileName( "invdeformation-initial.nii.gz" );
-        fieldwriter->SetInput( this->GetInvDeformationField()  );
-        fieldwriter->Update();
-      }
-      catch( itk::ExceptionObject& err )
-      {
-         std::cout << "Unexpected error." << std::endl;
-         std::cout << err << std::endl;
-         exit( EXIT_FAILURE );
-      }
-      // exit(0);
-     /*End Debug*/
-
+    this->SetInvDeformationField( this->GetDeformationField() ); //should be zeros
   }
-  else
+
+  /* Set the registration function's deformation field and its inverse */
+  f->SetDeformationField( this->GetDeformationField() ); 
+  f->SetInvDeformationField( this->GetInvDeformationField() );
+
+  /*Debug*/
+  try
   {
-    f->SetInvDeformationField( this->GetInvDeformationField() );
-      /*Debug*/
-      try
-      {
-        typedef itk::ImageFileWriter< DeformationFieldType>  FieldWriterType;
-        typename FieldWriterType::Pointer      fieldwriter =  FieldWriterType::New();
-        fieldwriter->SetUseCompression( true );
-        fieldwriter->SetFileName( "invdeformation.nii.gz" );
-        fieldwriter->SetInput( this->GetInvDeformationField()  );
-        fieldwriter->Update();
-        fieldwriter->SetFileName( "deformation.nii.gz" );
-        fieldwriter->SetInput( this->GetDeformationField()  );
-        fieldwriter->Update();
-      }
-      catch( itk::ExceptionObject& err )
-      {
-         std::cout << "Unexpected error." << std::endl;
-         std::cout << err << std::endl;
-         exit( EXIT_FAILURE );
-      }
-     /*End Debug*/
-
+    typedef itk::ImageFileWriter< DeformationFieldType>  FieldWriterType;
+    typename FieldWriterType::Pointer      fieldwriter =  FieldWriterType::New();
+    fieldwriter->SetUseCompression( true );
+    fieldwriter->SetFileName( "invdeformation.nii.gz" );
+    fieldwriter->SetInput( this->GetInvDeformationField()  );
+    fieldwriter->Update();
+    fieldwriter->SetFileName( "deformation.nii.gz" );
+    fieldwriter->SetInput( this->GetDeformationField()  );
+    fieldwriter->Update();
   }
+  catch( itk::ExceptionObject& err )
+  {
+    std::cout << "Unexpected error." << std::endl;
+    std::cout << err << std::endl;
+    exit( EXIT_FAILURE );
+  }
+  /*End Debug*/
 
-  f->SetDeformationField( this->GetDeformationField() );
 
   // call the superclass  implementation ( initializes f )
   Superclass::InitializeIteration();
 
- }
+
+  std::cout << "Finished InitializeIteration" << std::endl;
+}
 
 
 /*
@@ -132,17 +109,17 @@ double
 DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField>
 ::GetMetric() const
 {
- 
+
   DemonsRegistrationFunctionType *drfp = 
     dynamic_cast<DemonsRegistrationFunctionType *>
-      (this->GetDifferenceFunction().GetPointer());
- 
+    (this->GetDifferenceFunction().GetPointer());
+
   if( !drfp )
-   {
-   itkExceptionMacro( << 
-     "Could not cast difference function to DiffeomorphicDemonsRegistrationFunction" );
-   }
-   
+  {
+    itkExceptionMacro( << 
+        "Could not cast difference function to DiffeomorphicDemonsRegistrationFunction" );
+  }
+
   return drfp->GetMetric();
 }
 
@@ -327,6 +304,7 @@ void
 DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField>
 ::ApplyUpdate(TimeStepType dt)
 {
+  std::cout << "Entering ApplyUpdate" << std::endl;
    this->GetUpdateBuffer()->Modified();
    
   // If we smooth the update buffer before applying it, then the are
@@ -336,57 +314,24 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
     this->SmoothUpdateField();
     }
 
-  // use time step if necessary
+  /* use time step if necessary */
   if ( fabs(dt - 1.0)>1.0e-4 )
   {
      std::cout<<"Using timestep: "<<dt<<std::endl;
      m_Multiplier->SetConstant( dt );
      m_Multiplier->SetInput( this->GetUpdateBuffer() );
      m_Multiplier->GraftOutput( this->GetUpdateBuffer() );
-     // in place update
-     //m_Multiplier->UpdateLargestPossibleRegion();
+     // in place update //m_Multiplier->UpdateLargestPossibleRegion();
      m_Multiplier->Update();
-     // graft output back to this->GetUpdateBuffer()
      this->GetUpdateBuffer()->Graft( m_Multiplier->GetOutput() );
   }
 
-  /*
-   * Update the inverse deformation field
-   */
-  m_Multiplier->SetConstant( -1 );
-  m_Multiplier->SetInput( this->GetUpdateBuffer() );
-  // m_Multiplier->UpdateLargestPossibleRegion();
-  m_Multiplier->Update();
-  m_Exponentiator->SetInput( m_Multiplier->GetOutput() );
 
-  m_Warper->SetOutputSpacing( this->GetDeformationField()->GetSpacing() );
-  m_Warper->SetOutputOrigin( this->GetDeformationField()->GetOrigin() );
-  m_Warper->SetInput( this->GetInvDeformationField() );
-  m_Warper->SetDeformationField( m_Exponentiator->GetOutput() );
-  m_Adder->SetInput1( m_Warper->GetOutput() );
-  m_Adder->SetInput2( m_Exponentiator->GetOutput() );
-  m_Adder->GetOutput()->SetRequestedRegion( this->GetInvDeformationField()->GetRequestedRegion() );
-  m_Adder->Update();
-  this->SetInvDeformationField( m_Adder->GetOutput() );
-
-  // Smooth the *inverse* field
-  if ( this->GetSmoothDeformationField() )
-  {
-    this->GraftOutput( this->GetInvDeformationField() );
-    this->SmoothDeformationField();
-    m_Adder->GraftOutput(this->GetOutput() );
-  }
-
-
-
-  /*
-   * Update the deformation field
-   */
-  m_Exponentiator->SetInput( this->GetUpdateBuffer() );
+  /* Configure the exponentiator */
   const double imposedMaxUpStep = this->GetMaximumUpdateStepLength();
   if ( imposedMaxUpStep > 0.0 )
   {
-     // max(norm(Phi))/2^N < 0.25*pixelspacing
+     /* max(norm(Phi))/2^N < 0.25*pixelspacing */
      const double numiterfloat = 2.0 + vcl_log(imposedMaxUpStep)/vnl_math::ln2;
      unsigned int numiter = 0;
      if ( numiterfloat > 0.0 )
@@ -402,50 +347,81 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
   }
 
 
-  std::cout << "itkDiffeomorphicDemonsRegistrationFilter::ApplyUpdate: Composing the vector fields" << this->GetUpdateBuffer()->GetLargestPossibleRegion().GetSize()[0] << std::endl;
+  /*DEBUG*/
+  // m_Multiplier->SetConstant( 14.0 );
+  // m_Multiplier->SetInput( this->GetUpdateBuffer() );
+  // m_Multiplier->UpdateLargestPossibleRegion();
+  // this->GetUpdateBuffer()->Graft( m_Multiplier->GetOutput() );
+  /*END DEBUG*/
 
-  // compose the vector fields
+
+  /* Multiply the update buffer by -1 */ 
+  m_Multiplier->SetConstant( -1 );
+  m_Multiplier->SetInput( this->GetUpdateBuffer() ); 
+  m_Multiplier->Update();// m_Multiplier->UpdateLargestPossibleRegion();
+
+
+  /* Compose the vector fields to update the inverse warp field */
+  m_Exponentiator->SetInput( m_Multiplier->GetOutput() );
+  m_Warper->SetOutputSpacing( this->GetDeformationField()->GetSpacing() );
+  m_Warper->SetOutputOrigin( this->GetDeformationField()->GetOrigin() );
+  m_Warper->SetInput( this->GetInvDeformationField() );
+  m_Warper->SetDeformationField( m_Exponentiator->GetOutput() );
+  m_Adder->SetInput1( m_Warper->GetOutput() );
+  m_Adder->SetInput2( m_Exponentiator->GetOutput() );
+  m_Adder->GetOutput()->SetRequestedRegion( this->GetInvDeformationField()->GetRequestedRegion() );
+  m_Adder->Update();
+  this->SetInvDeformationField( m_Adder->GetOutput() );
+  this->GetInvDeformationField()->DisconnectPipeline();
+
+
+  /* Compose the vector fields to update the warp field */
+  std::cout << "itkDiffeomorphicDemonsRegistrationFilter::ApplyUpdate: Composing the vector fields" << this->GetUpdateBuffer()->GetLargestPossibleRegion().GetSize()[0] << std::endl;
+  m_Exponentiator->SetInput( this->GetUpdateBuffer() );
   m_Warper->SetOutputSpacing( this->GetUpdateBuffer()->GetSpacing() );
   m_Warper->SetOutputOrigin( this->GetUpdateBuffer()->GetOrigin() );
   m_Warper->SetInput( this->GetOutput() );
   m_Warper->SetDeformationField( m_Exponentiator->GetOutput() );
-
   m_Adder->SetInput1( m_Warper->GetOutput() );
   m_Adder->SetInput2( m_Exponentiator->GetOutput() );
-  
   //m_Adder->UpdateLargestPossibleRegion();
   m_Adder->GetOutput()->SetRequestedRegion( this->GetOutput()->GetRequestedRegion() );
   m_Adder->Update();
-
   //std::cout<<"out buff spac: "<<this->GetOutput()->GetSpacing()<<std::endl;
   //std::cout<<"up buff spac: "<<this->GetUpdateBuffer()->GetSpacing()<<std::endl;
   //std::cout<<"exp out spac: "<<m_Exponentiator->GetOutput()->GetSpacing()<<std::endl;
   //std::cout<<"warp out spac: "<<m_Warper->GetOutput()->GetSpacing()<<std::endl;
   //std::cout<<"add out spac: "<<m_Adder->GetOutput()->GetSpacing()<<std::endl;
   
-  // Region passing stuff
+
+  /* Before we update the output we use that buffer to smooth the inverse warp field */
+  if ( this->GetSmoothDeformationField() )
+  {
+    this->GraftOutput( this->GetInvDeformationField() );
+    this->SmoothDeformationField();
+    this->SetInvDeformationField( this->GetOutput() );
+    this->GetInvDeformationField()->DisconnectPipeline();
+  }
+
+
+  /* Update the output with the new warp field */
   this->GraftOutput( m_Adder->GetOutput() );
 
-  
 
-  DemonsRegistrationFunctionType *drfp = 
-    dynamic_cast<DemonsRegistrationFunctionType *>
-      (this->GetDifferenceFunction().GetPointer());
- 
+  /* Set the RMS change */
+  DemonsRegistrationFunctionType *drfp = dynamic_cast<DemonsRegistrationFunctionType *> (this->GetDifferenceFunction().GetPointer());
   if( !drfp )
    {
-   itkExceptionMacro( << 
-     "Could not cast difference function to DemonsRegistrationFunction" );
+   itkExceptionMacro( << "Could not cast difference function to DemonsRegistrationFunction" );
    }
-
   this->SetRMSChange( drfp->GetRMSChange() );
 
-  // Smooth the deformation field
+
+  /* Smooth the output (the warp field) */
   if ( this->GetSmoothDeformationField() )
   {
      this->SmoothDeformationField();
   }
-
 
 }
 

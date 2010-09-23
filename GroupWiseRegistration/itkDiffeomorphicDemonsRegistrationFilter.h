@@ -164,6 +164,14 @@ public:
   DeformationFieldType * GetLogDeformationField(void)
   { return m_logDeformationField; }
 
+  double m_RegWeight;
+
+  double GetRegWeight(void)
+  { return m_RegWeight; }
+
+  void SetRegWeight(double regWeight)
+  { m_RegWeight = regWeight; }
+
 
 protected:
   DiffeomorphicDemonsRegistrationFilter();
