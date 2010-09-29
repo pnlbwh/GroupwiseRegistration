@@ -595,6 +595,129 @@ void ComputeTemplate( arguments args, int iter, bool useWarps )
 }
 
 
+template <class TDeformationFieldType>
+void NormalizeWarps( arguments args, int iter )
+{
+  typedef typename itk::ImageFileReader< TDeformationFieldType > DefFieldReaderType;
+  typedef itk::AddImageFilter<TDeformationFieldType, TDeformationFieldType, TDeformationFieldType> AdderType;
+  typedef itk::ImageFileWriter< TDeformationFieldType >    WriterType;
+
+  typename DefFieldReaderType::Pointer      defFieldReader = DefFieldReaderType::New();
+  typename WriterType::Pointer              writer =  WriterType::New();
+  typename AdderType::Pointer               adder = AdderType::New();
+  typename TDeformationFieldType::Pointer                  avg_def = TDeformationFieldType::New();
+  typename TDeformationFieldType::Pointer                  image;
+  typename TDeformationFieldType::RegionType               region;
+  typename TDeformationFieldType::IndexType                start;
+
+  for (unsigned int i=0; i < args.volumeFileNames.size(); i++)
+  {
+    /* Read in the current image's warp */
+    std::stringstream deformation_name;
+    deformation_name << args.volumeFileNames[i] << "_" << iter << "_deformation.nii.gz";
+    defFieldReader->SetFileName( deformation_name.str() );
+    try
+    {
+      defFieldReader->Update();
+    }
+    catch( itk::ExceptionObject& err )
+    {
+      std::cout << "Could not read one of the deformation fields." << std::endl;
+      std::cout << err << std::endl;
+      exit( EXIT_FAILURE );
+    }
+    image = defFieldReader->GetOutput();
+
+    /* Initialize weight as a zero volume */
+    if (i==0)
+    {
+      region.SetSize( image->GetLargestPossibleRegion().GetSize() );
+      start.Fill(0);
+      region.SetIndex( start );
+      avg_def->SetDirection( image->GetDirection() );
+      avg_def->SetOrigin( image->GetOrigin() );
+      avg_def->SetSpacing( image->GetSpacing() );
+      avg_def->SetRegions( region );
+      avg_def->Allocate();
+      avg_def->FillBuffer( 0.0 );
+    }
+
+    adder->SetInput1( avg_def );
+    adder->SetInput2( defFieldReader->GetOutput() );
+    adder->Update();
+    avg_def = adder->GetOutput();
+    avg_def->DisconnectPipeline();
+  }
+
+  /* Divide the total by the number of volumes, and make it negative */
+  typedef itk::MultiplyByConstantImageFilter< TDeformationFieldType, float, TDeformationFieldType >   MultiplyByConstantType;
+  typename MultiplyByConstantType::Pointer  multiplier = MultiplyByConstantType::New();
+  std::cout << "1 / number of files = " << 1.0/args.volumeFileNames.size() << std::endl;
+  multiplier->SetConstant( -1 * 1.0/args.volumeFileNames.size() );
+  multiplier->SetInput( avg_def );
+  multiplier->Update();
+  avg_def = multiplier->GetOutput();
+
+
+  /* DEBUG Write the avagerage volume to file */
+  std::stringstream deformation_name;
+  deformation_name << "neg_warp_avg_" << iter << ".nii.gz";
+  writer->SetFileName( deformation_name.str() );
+  writer->SetUseCompression( true );
+  writer->SetInput( adder->GetOutput() );
+  try
+  {
+    writer->Update();
+  }
+  catch( itk::ExceptionObject& err )
+  {
+    std::cout << "Unexpected error." << std::endl;
+    std::cout << err << std::endl;
+    exit( EXIT_FAILURE );
+  }
+
+
+  for (unsigned int i=0; i < args.volumeFileNames.size(); i++)
+  {
+    /* Read in the current image's warp */
+    std::stringstream deformation_name;
+    deformation_name << args.volumeFileNames[i] << "_" << iter << "_deformation.nii.gz";
+    defFieldReader->SetFileName( deformation_name.str() );
+    try
+    {
+      defFieldReader->Update();
+    }
+    catch( itk::ExceptionObject& err )
+    {
+      std::cout << "Could not read one of the deformation fields." << std::endl;
+      std::cout << err << std::endl;
+      exit( EXIT_FAILURE );
+    }
+
+    adder->SetInput1( avg_def );
+    adder->SetInput2( defFieldReader->GetOutput() );
+    adder->Update();
+
+    /* Write the new warp to file */
+    writer->SetFileName( deformation_name.str() );
+    writer->SetUseCompression( true );
+    writer->SetInput( adder->GetOutput() );
+    try
+    {
+      writer->Update();
+    }
+    catch( itk::ExceptionObject& err )
+    {
+      std::cout << "Unexpected error." << std::endl;
+      std::cout << err << std::endl;
+      exit( EXIT_FAILURE );
+    }
+
+  }
+
+}
+
+
 template <unsigned int Dimension>
 void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], std::string resultsDirectory, std::string outputVolume, bool useJacFlag )
 {
@@ -617,8 +740,6 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
   //{//for mem allocations
 
 
- 
-
   /* Compute the initial template */
   ComputeTemplate<ImageType, DeformationFieldType>(args, 0, false);
 
@@ -626,8 +747,6 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
   /* For number of outer iterations */
   for (unsigned int j = 0; j < args.numOuterIterations; ++j)
   {
-
-    
 
     /*  Load the template from disk */
     template_name.str("");
@@ -669,7 +788,8 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
       typedef typename itk::DiffeomorphicDemonsRegistrationFilter < ImageType, ImageType, DeformationFieldType>   ActualRegistrationFilterType;
       typename         ActualRegistrationFilterType::Pointer          filter = ActualRegistrationFilterType::New();
       typename         DemonsRegistrationFunctionType::GradientType   gtype =  DemonsRegistrationFunctionType::Symmetric;
-      filter->SetMaximumUpdateStepLength( 100.0 ); //TODO: check this //filter->SetMaximumUpdateStepLength( args.maxStepLength );
+      //filter->SetMaximumUpdateStepLength( 0.0 ); //TODO: check this //filter->SetMaximumUpdateStepLength( args.maxStepLength );
+      filter->SetMaximumUpdateStepLength( 2.0 ); //TODO: check this //filter->SetMaximumUpdateStepLength( args.maxStepLength );
       // filter->SetMaximumUpdateStepLength( 0.1 ); //TODO: check this //filter->SetMaximumUpdateStepLength( args.maxStepLength );
       //filter->SetRegWeight( 10.0 );
       filter->SetUseGradientType( gtype ); //Symmetric is used in ESMInvConDemonsRegistrationFunction 
@@ -743,12 +863,26 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
         exit( EXIT_FAILURE );
       }
 
+      /* DEBUG: Save the warp as, e.g. image1_0_deformation-orig.nii.gz */
+      deformation_name.str("");
+      deformation_name << args.volumeFileNames[i] << "_" << j << "_" "deformation-orig.nii.gz";
+      defWriter->SetFileName( deformation_name.str() );
+      defWriter->SetInput( defField  );
+      defWriter->SetUseCompression( true );
+      try
+      {
+        defWriter->Update();
+      }
+      catch( itk::ExceptionObject& err )
+      {
+        std::cout << "Unexpected error." << std::endl;
+        std::cout << err << std::endl;
+        exit( EXIT_FAILURE );
+      }
+
     } // end for each image
 
-    /* Renormalize the warps TODO */
-    // if (renormalize_warps_flag)
-    //     renormalize_warps(SBJ_CELL, Output_dir, CurTemplateWarpName);
-    // end
+    NormalizeWarps<DeformationFieldType>(args, j);
 
     /* Compute the new template */
     ComputeTemplate<ImageType, DeformationFieldType>(args, j+1, true);

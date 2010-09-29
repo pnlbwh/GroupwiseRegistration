@@ -17,7 +17,7 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
   drfp = DemonsRegistrationFunctionType::New();
   // drfp->SetRegWeight(this->GetRegWeight());
   // drfp->SetRegWeight(0.1); //inverse error
-  drfp->SetRegWeight(1.0);
+  drfp->SetRegWeight(10.0);
   // std::cout << "Reg Weight is " << this->GetRegWeight() << std::endl;
 
   this->SetDifferenceFunction( static_cast<FiniteDifferenceFunctionType *>( drfp.GetPointer() ) );
