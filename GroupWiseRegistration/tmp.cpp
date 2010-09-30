@@ -222,3 +222,129 @@ std::cout<<"update buffer image size: "<<this->GetUpdateBuffer()->GetLargestPoss
   // }
   // f->SetDeformationField( this->GetDeformationField() );
 
+
+  // std::stringstream warped_image_name;
+  // warped_image_name << args.volumeFileNames[0] << "_" << "4" << "_warped.nii.gz";
+  // typename ImageReaderType::Pointer reader = ImageReaderType::New();
+  // reader->SetFileName(warped_image_name.str());
+  // try
+  // {
+  //   reader->Update();
+  // }
+  // catch( itk::ExceptionObject& err )
+  // {
+  //   std::cout << "Could not read warped image." << std::endl;
+  //   std::cout << err << std::endl;
+  //   exit( EXIT_FAILURE );
+  // }
+  // warped_image_name.str("");
+  // warped_image_name << args.volumeFileNames[1] << "_" << "4" << "_warped.nii.gz";
+  // typename ImageReaderType::Pointer reader2 = ImageReaderType::New();
+  // reader2->SetFileName(warped_image_name.str());
+  // try
+  // {
+  //   reader2->Update();
+  // }
+  // catch( itk::ExceptionObject& err )
+  // {
+  //   std::cout << "Could not read warped image." << std::endl;
+  //   std::cout << err << std::endl;
+  //   exit( EXIT_FAILURE );
+  // }
+
+  // typedef itk::AddImageFilter<ImageType, ImageType, ImageType> AdderType;
+  // typename AdderType::Pointer               adder = AdderType::New();
+  // adder->SetInput1( reader->GetOutput() );
+  // adder->SetInput2( reader2->GetOutput() );
+  // adder->Update();
+  //     writer->SetFileName( "test_template.nii.gz" );
+  //     writer->SetInput( adder->GetOutput()  );
+  //     writer->SetUseCompression( true );
+  //     try
+  //     {
+  //       writer->Update();
+  //     }
+  //     catch( itk::ExceptionObject& err )
+  //     {
+  //       std::cout << "Unexpected error." << std::endl;
+  //       std::cout << err << std::endl;
+  //       exit( EXIT_FAILURE );
+  //     }
+  //     exit(0);
+
+ //template_vol = imageReader2->GetOutput();
+    //template_vol->DisconnectPipeline();
+    
+    //ImageReaderType::Pointer imageReader2 = ImageReaderType::New();
+    //imageReader2->SetFileName(template_name.str());
+    //try
+    //{
+      //imageReader2->Update();
+    //}
+    //catch( itk::ExceptionObject& err )
+    //{
+      //std::cout << "Could not read one of the input images." << std::endl;
+      //std::cout << err << std::endl;
+      //exit( EXIT_FAILURE );
+    //}
+    //ImageType::Pointer                  template_vol = 0;
+    //template_vol = imageReader2->GetOutput();
+    //template_vol->DisconnectPipeline();
+
+  DemonsRegistrationFunctionType::GradientType   gtype;
+//if ( args.initialSigmaDiff > 0.1 ) // if ( args.sigmaDef > 0.1 )
+      //{
+        //filter->SmoothDeformationFieldOn();
+        //filter->SetStandardDeviations( args.initialSigmaDiff );  //TODO Update with a range
+      //}
+      //else
+        //filter->SmoothDeformationFieldOff();
+
+      //if ( args.sigmaUp > 0.1 )
+      //{
+        //filter->SmoothUpdateFieldOn();
+        //filter->SetUpdateFieldStandardDeviations( args.sigmaUp );
+      //}
+      //else
+        //filter->SmoothUpdateFieldOff();
+
+      // filter->SetInitialDeformationField( deformationReader->GetOutput() );
+
+
+ DeformationWriterType::Pointer  defWriter =  DeformationWriterType::New();
+      defWriter->SetFileName( deformation_name.str() );
+      defWriter->SetInput( field  );
+      defWriter->SetUseCompression( true );
+      try
+      {
+        defWriter->Update();
+      }
+      catch( itk::ExceptionObject& err )
+      {
+        std::cout << "Unexpected error." << std::endl;
+        std::cout << err << std::endl;
+        exit( EXIT_FAILURE );
+      }
+
+defWriter->SetFileName( deformation_name.str() );
+      defWriter->SetInput( field  );
+      defWriter->SetUseCompression( true );
+      try
+      {
+        defWriter->Update();
+      }
+      catch( itk::ExceptionObject& err )
+      {
+        std::cout << "Unexpected error." << std::endl;
+        std::cout << err << std::endl;
+        exit( EXIT_FAILURE );
+      }
+      /* Save the warp, e.g. image1_0_deformation.nii.gz */
+      deformation_name.str("");
+      deformation_name << args.volumeFileNames[i] << "_" << j << "_" "deformation.nii.gz";
+      WriteDeformationField(field, deformation_name.str());
+
+      /* DEBUG: Save the warp as, e.g. image1_0_deformation-orig.nii.gz */
+      deformation_name.str("");
+      deformation_name << args.volumeFileNames[i] << "_" << j << "_" "deformation-orig.nii.gz";
+
