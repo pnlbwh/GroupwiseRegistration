@@ -463,8 +463,7 @@ MakeZeroVolume(ImageType::Pointer &template_vol, ImageType::Pointer image)
 }
 
 
-void
-ReadImage(ImageReaderType::Pointer &reader, std::string filename)
+void ReadImage(ImageReaderType::Pointer &reader, std::string filename)
 {
   reader->SetFileName( filename );
   try
@@ -480,9 +479,8 @@ ReadImage(ImageReaderType::Pointer &reader, std::string filename)
 }
 
 
-ImageType::Pointer GetImage(std::string filename)
+void GetImage(std::string filename, ImageType::Pointer& image)
 {
-  ImageType::Pointer result;
   ImageReaderType::Pointer imageReader = ImageReaderType::New();
   imageReader->SetFileName(filename);
   try
@@ -495,9 +493,8 @@ ImageType::Pointer GetImage(std::string filename)
     std::cout << err << std::endl;
     exit( EXIT_FAILURE );
   }
-  result = imageReader->GetOutput();
-  result->DisconnectPipeline();
-  return result;
+  image = imageReader->GetOutput();
+  image->DisconnectPipeline();
 }
 
 
@@ -531,7 +528,7 @@ void ComputeMean( arguments args )
 
   for (unsigned int i=0; i < args.volumeFileNames.size(); i++)
   {
-    image = GetImage(args.volumeFileNames[i]);
+    GetImage(args.volumeFileNames[i], image);
 
     if (i==0)
     {
@@ -576,24 +573,13 @@ void ComputeTemplateWarps( arguments args, int iter)
   ImageType::Pointer 			        jacobianimage = ImageType::New();
   ImageType::Pointer               template_vol =  ImageType::New();
   ImageType::Pointer               jacobian = 0;
-  ImageType::Pointer               image = 0;
+  ImageType::Pointer               image;
   ImageType::Pointer               weight = ImageType::New();
 
 
   for (unsigned int i=0; i < args.volumeFileNames.size(); i++)
   {
-    imageReader->SetFileName( args.volumeFileNames[i] );
-    try
-    {
-      imageReader->Update();
-    }
-    catch( itk::ExceptionObject& err )
-    {
-      std::cout << "Could not read one of the input images." << std::endl;
-      std::cout << err << std::endl;
-      exit( EXIT_FAILURE );
-    }
-    image = imageReader->GetOutput();
+    GetImage(args.volumeFileNames[i], image);
 
     if (i==0)
     {
@@ -869,7 +855,7 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
     std::cout << " Starting Outer Iteration  " << j << std::endl;
     std::cout << "=========================================================================================" << std::endl;
 
-    template_vol = GetImage(TemplateName(j));
+    GetImage(TemplateName(j), template_vol);
 
     for (unsigned int i = 0; i < args.volumeFileNames.size(); ++i)
     {
