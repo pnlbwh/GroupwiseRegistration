@@ -507,7 +507,8 @@ std::string TemplateName(int i)
 
 void UpdateWriter(WriterType::Pointer &writer, std::string error_msg)
 {
-try
+  writer->SetUseCompression( true );
+  try
   {
     writer->Update();
   }
@@ -520,15 +521,15 @@ try
 }
 
 
-void ComputeMean( arguments args )
+void ComputeMean( std::vector<std::string> filenames, std::string filename)
 {
   AdderType::Pointer          adder = AdderType::New();
   ImageType::Pointer          template_vol =  ImageType::New();
   ImageType::Pointer          image;
 
-  for (unsigned int i=0; i < args.volumeFileNames.size(); i++)
+  for (unsigned int i=0; i < filenames.size(); i++)
   {
-    GetImage(args.volumeFileNames[i], image);
+    GetImage(filenames[i], image);
 
     if (i==0)
     {
@@ -541,136 +542,99 @@ void ComputeMean( arguments args )
   }
 
   MultiplyByConstantType::Pointer  multiplier = MultiplyByConstantType::New();
-  multiplier->SetConstant( 1.0/args.volumeFileNames.size() );
+  multiplier->SetConstant( 1.0/filenames.size() );
   multiplier->SetInput( template_vol );
   WriterType::Pointer         writer =  WriterType::New();
-  writer->SetFileName( TemplateName(0) );
+  writer->SetFileName( filename );
   writer->SetUseCompression( true );
   writer->SetInput( multiplier->GetOutput() );
   UpdateWriter(writer, "Could not write template to disk");
 }
 
 
-
-void ComputeTemplateWarps( arguments args, int iter)
+std::string FieldName(std::string imageName, int i)
 {
-  if (iter == 0)
-  {
-    ComputeMean( args );
-    return;
-  }
+  std::stringstream result;
+  result << imageName << "_" << i << "_deformation.nii.gz";
+  return result.str();
+}
 
+
+std::string WarpedImageName(std::string imageName, int i)
+{
+  std::stringstream result;
+  result << imageName << "_" << i << "_warped.nii.gz";
+  return result.str();
+}
+
+
+void ComputeTemplateFromWarps( std::vector<std::string> filenames, int iter )
+{
   typedef itk::DisplacementFieldJacobianDeterminantFilter <DeformationFieldType, float>    JacobianDeterminantFilterType;
-
   JacobianDeterminantFilterType::Pointer jacdetfilter = JacobianDeterminantFilterType::New();
-
+  jacdetfilter->SetUseImageSpacing( false );
   ImageReaderType::Pointer         imageReader = ImageReaderType::New();
-  DeformationReaderType::Pointer   defFieldReader = DeformationReaderType::New();
+  DeformationReaderType::Pointer   fieldReader = DeformationReaderType::New();
   WriterType::Pointer              writer =  WriterType::New();
+  writer->SetUseCompression( true );
   AdderType::Pointer               adder = AdderType::New();
-  AdderType::Pointer               adder2 = AdderType::New();
+  AdderType::Pointer               jacDetAdder = AdderType::New();
   WarperType::Pointer              warper = WarperType::New();
-  ImageType::Pointer 			        jacobianimage = ImageType::New();
-  ImageType::Pointer               template_vol =  ImageType::New();
-  ImageType::Pointer               jacobian = 0;
   ImageType::Pointer               image;
-  ImageType::Pointer               weight = ImageType::New();
+  ImageType::Pointer               imgSum =  ImageType::New();
+  ImageType::Pointer               jacDetSum = ImageType::New();
 
-
-  for (unsigned int i=0; i < args.volumeFileNames.size(); i++)
+  for (unsigned int i=0; i < filenames.size(); i++)
   {
-    GetImage(args.volumeFileNames[i], image);
-
+    GetImage(filenames[i], image);
     if (i==0)
     {
-      MakeZeroVolume(template_vol, image);
-      MakeZeroVolume(weight, image);
+      MakeZeroVolume(imgSum, image);
+      MakeZeroVolume(jacDetSum, image);
     }
-
-    /* Read in the current image's warp */
-    std::stringstream deformation_name;
-    deformation_name << args.volumeFileNames[i] << "_" << iter-1 << "_deformation.nii.gz";
-    defFieldReader->SetFileName( deformation_name.str() );
-    try
-    {
-      defFieldReader->Update();
-    }
-    catch( itk::ExceptionObject& err )
-    {
-      std::cout << "Could not read one of the deformation fields." << std::endl;
-      std::cout << err << std::endl;
-      exit( EXIT_FAILURE );
-    }
-
-    /* Warp the image */
+    fieldReader->SetFileName( FieldName(filenames[i], iter-1) );
     warper->SetInput( image );
     warper->SetOutputSpacing( image->GetSpacing() );
     warper->SetOutputOrigin( image->GetOrigin() );
     warper->SetOutputDirection( image->GetDirection() );
-    warper->SetDeformationField( defFieldReader->GetOutput() );
-    image = warper->GetOutput();
+    warper->SetDeformationField( fieldReader->GetOutput() );
+    writer->SetFileName( WarpedImageName(filenames[i], iter-1) );
+    writer->SetInput( warper->GetOutput() );
+    UpdateWriter(writer, "Could not write warped image to disk");
 
-    /* Write the warped image to disk */
-    std::stringstream warped_image_name;
-    warped_image_name << args.volumeFileNames[i] << "_" << iter-1 << "_warped.nii.gz";
-    writer->SetFileName( warped_image_name.str() );
-    writer->SetUseCompression( true );
-    writer->SetInput( image );
-    try
-    {
-      writer->Update();
-    }
-    catch( itk::ExceptionObject& err )
-    {
-      std::cout << "Could not write warped image to disk." << std::endl;
-      std::cout << err << std::endl;
-      exit( EXIT_FAILURE );
-    }
+    //jacdetfilter->UpdateLargestPossibleRegion();
+    jacDetAdder->SetInput1( jacDetSum );
+    jacdetfilter->SetInput( fieldReader->GetOutput() );
+    jacDetAdder->SetInput2( jacdetfilter->GetOutput() );
+    jacDetAdder->Update();
+    jacDetSum = jacDetAdder->GetOutput();
 
-    /* Compute the jacobian of the warp and add to the running total (weight) */
-    jacdetfilter->SetInput( defFieldReader->GetOutput() );
-    jacdetfilter->SetUseImageSpacing( false );
-    jacdetfilter->UpdateLargestPossibleRegion();
-    adder2->SetInput1( weight );
-    adder2->SetInput2( jacdetfilter->GetOutput() );
-    adder2->Update();
-    weight = adder2->GetOutput();
-
-    /* Add the image to the running total (template_vol) */
-    adder->SetInput1( template_vol );
-    adder->SetInput2( image );
+    adder->SetInput1( imgSum );
+    adder->SetInput2( warper->GetOutput() );
     adder->Update();
-    template_vol = adder->GetOutput();
+    imgSum = adder->GetOutput();
   }
-
-  /* Divide template_vol by the weight */
-    DivideByImageType::Pointer  divider = DivideByImageType::New();
-    divider->SetInput1( template_vol );
-    divider->SetInput2( weight );
-    divider->Update();
-    template_vol = divider->GetOutput();
-
-  /* Write the template_vol to disk (e.g. template0.nii.gz) */
-  std::stringstream template_name;
-  template_name << "template" << iter << ".nii.gz";
-  writer->SetFileName( template_name.str() );
-  writer->SetUseCompression( true );
-  writer->SetInput( template_vol );
-  try
-  {
-    writer->Update();
-  }
-  catch( itk::ExceptionObject& err )
-  {
-    std::cout << "Unexpected error." << std::endl;
-    std::cout << err << std::endl;
-    exit( EXIT_FAILURE );
-  }
-
+  DivideByImageType::Pointer divider = DivideByImageType::New();
+  divider->SetInput1( imgSum );
+  divider->SetInput2( jacDetSum );
+  writer->SetFileName( TemplateName(iter) );
+  writer->SetInput( divider->GetOutput() );
+  UpdateWriter(writer, "Could not save the template.");
 }
 
 
-void NormalizeWarps( arguments args, int iter )
+void ComputeTemplate( std::vector<std::string> filenames, int iter )
+{
+  if (iter == 0)
+  {
+    ComputeMean( filenames, TemplateName(0) );
+    return;
+  }
+  ComputeTemplateFromWarps( filenames, iter);
+}
+
+
+void NormalizeWarps( std::vector<std::string> filenames, int iter )
 {
   DeformationWriterType::Pointer                writer =  DeformationWriterType::New();
   DeformationReaderType::Pointer     defFieldReader = DeformationReaderType::New();
@@ -680,11 +644,11 @@ void NormalizeWarps( arguments args, int iter )
   DeformationFieldType::RegionType  region;
   DeformationFieldType::IndexType   start;
 
-  for (unsigned int i=0; i < args.volumeFileNames.size(); i++)
+  for (unsigned int i=0; i < filenames.size(); i++)
   {
     /* Read in the current image's warp */
     std::stringstream deformation_name;
-    deformation_name << args.volumeFileNames[i] << "_" << iter << "_deformation.nii.gz";
+    deformation_name << filenames[i] << "_" << iter << "_deformation.nii.gz";
     defFieldReader->SetFileName( deformation_name.str() );
     try
     {
@@ -720,8 +684,8 @@ void NormalizeWarps( arguments args, int iter )
 
   /* Divide the total by the number of volumes, and make it negative */
   DeformationMultiplyByConstantType::Pointer  multiplier = DeformationMultiplyByConstantType::New();
-  std::cout << "1 / number of files = " << 1.0/args.volumeFileNames.size() << std::endl;
-  multiplier->SetConstant( -1 * 1.0/args.volumeFileNames.size() );
+  std::cout << "1 / number of files = " << 1.0/filenames.size() << std::endl;
+  multiplier->SetConstant( -1 * 1.0/filenames.size() );
   multiplier->SetInput( avg_def );
   multiplier->Update();
   avg_def = multiplier->GetOutput();
@@ -745,11 +709,11 @@ void NormalizeWarps( arguments args, int iter )
   }
 
 
-  for (unsigned int i=0; i < args.volumeFileNames.size(); i++)
+  for (unsigned int i=0; i < filenames.size(); i++)
   {
     /* Read in the current image's warp */
     std::stringstream deformation_name;
-    deformation_name << args.volumeFileNames[i] << "_" << iter << "_deformation.nii.gz";
+    deformation_name << filenames[i] << "_" << iter << "_deformation.nii.gz";
     defFieldReader->SetFileName( deformation_name.str() );
     try
     {
@@ -785,6 +749,7 @@ void NormalizeWarps( arguments args, int iter )
 
 }
 
+
 void WriteDeformationField(DeformationFieldType::Pointer image, std::string filename)
 {
   DeformationWriterType::Pointer  writer =  DeformationWriterType::New();
@@ -803,33 +768,44 @@ void WriteDeformationField(DeformationFieldType::Pointer image, std::string file
   }
 }
 
+
+std::string DeformationName(std::string filename, int i)
+{
+  std::stringstream result;
+  result << filename << "_" << i << "_" "deformation.nii.gz";
+  return result.str();
+}
+
+
 void WriteNthDeformationField(DeformationFieldType::Pointer field, std::string image_name, int i)
 {
+  WriteDeformationField(field, DeformationName(image_name, i));
+
+  /*DEBUG*/
   std::stringstream deformation_name;
-  deformation_name << image_name << "_" << i << "_" "deformation.nii.gz";
-  WriteDeformationField(field, deformation_name.str());
-  deformation_name.str("");
   deformation_name << image_name << "_" << i << "_" "deformation-orig.nii.gz";
   WriteDeformationField(field, deformation_name.str());
+  /*DEBUG*/
 }
+
 
 void SetFilterSmoothing(ActualRegistrationFilterType::Pointer filter, float sigmaDef, float sigmaDiff, float sigmaUp)
 {
-      if ( sigmaDef > 0.1 ) // if ( args.sigmaDef > 0.1 )
-      {
-        filter->SmoothDeformationFieldOn();
-        filter->SetStandardDeviations( sigmaDiff );  //TODO Update with a range
-      }
-      else
-        filter->SmoothDeformationFieldOff();
+  if ( sigmaDef > 0.1 ) // if ( args.sigmaDef > 0.1 )
+  {
+    filter->SmoothDeformationFieldOn();
+    filter->SetStandardDeviations( sigmaDiff );  //TODO Update with a range
+  }
+  else
+    filter->SmoothDeformationFieldOff();
 
-      if ( sigmaUp > 0.1 )
-      {
-        filter->SmoothUpdateFieldOn();
-        filter->SetUpdateFieldStandardDeviations( sigmaUp );
-      }
-      else
-        filter->SmoothUpdateFieldOff();
+  if ( sigmaUp > 0.1 )
+  {
+    filter->SmoothUpdateFieldOn();
+    filter->SetUpdateFieldStandardDeviations( sigmaUp );
+  }
+  else
+    filter->SmoothUpdateFieldOff();
 }
 
 
@@ -847,7 +823,7 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
   DeformationFieldType::Pointer field = 0;
   //{//for mem allocations
 
-  ComputeTemplateWarps(args, 0);
+  ComputeTemplate(args.volumeFileNames, 0);
 
   for (unsigned int j = 0; j < args.numOuterIterations; ++j)
   {
@@ -898,15 +874,19 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
       }
       //field = multires->GetOutput();
       //field->DisconnectPipeline();
-
       //WriteNthDeformationField(field, args.volumeFileNames[i], j);
-      WriteNthDeformationField(multires->GetOutput(), args.volumeFileNames[i], j);
+      //WriteNthDeformationField(multires->GetOutput(), args.volumeFileNames[i], j);
+      WriteDeformationField(multires->GetOutput(), DeformationName(args.volumeFileNames[i], j));
+      /*DEBUG*/
+      std::stringstream deformation_name;
+      deformation_name << args.volumeFileNames[i] << "_" << j << "_" "deformation-orig.nii.gz";
+      WriteDeformationField(multires->GetOutput(), deformation_name.str());
+      /*DEBUG*/
     } 
 
-    NormalizeWarps(args, j);
+    NormalizeWarps(args.volumeFileNames, j);
 
-    //ComputeTemplate(args, j+1, true);
-    ComputeTemplateWarps(args, j+1);
+    ComputeTemplate(args.volumeFileNames, j+1);
   }
   
 
