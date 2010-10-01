@@ -446,6 +446,217 @@ protected:
    }
 };
 
+void
+MakeZeroVolume(ImageType::Pointer &template_vol, ImageType::Pointer image)
+{
+  ImageType::RegionType            region;
+  ImageType::IndexType             start;
+  region.SetSize( image->GetLargestPossibleRegion().GetSize() );
+  start.Fill(0);
+  region.SetIndex( start );
+  template_vol->SetDirection( image->GetDirection() );
+  template_vol->SetOrigin( image->GetOrigin() );
+  template_vol->SetSpacing( image->GetSpacing());
+      template_vol->SetRegions( region );
+      template_vol->Allocate();
+      template_vol->FillBuffer( 0.0 );
+}
+
+
+void ComputeMean( arguments args )
+{
+  ImageReaderType::Pointer    imageReader = ImageReaderType::New();
+  WriterType::Pointer         writer =  WriterType::New();
+  AdderType::Pointer          adder = AdderType::New();
+  AdderType::Pointer          adder2 = AdderType::New();
+  ImageType::Pointer          template_vol =  ImageType::New();
+  ImageType::Pointer          image;
+
+  for (unsigned int i=0; i < args.volumeFileNames.size(); i++)
+  {
+    imageReader->SetFileName( args.volumeFileNames[i] );
+    try
+    {
+      imageReader->Update();
+    }
+    catch( itk::ExceptionObject& err )
+    {
+      std::cout << "Could not read one of the input images." << std::endl;
+      std::cout << err << std::endl;
+      exit( EXIT_FAILURE );
+    }
+    image = imageReader->GetOutput();
+
+
+    /* Initialize template_vol as a zero volume */
+    if (i==0)
+    {
+      MakeZeroVolume(template_vol, image);
+    }
+
+
+    /* Add the image to the running total (template_vol) */
+    adder->SetInput1( template_vol );
+    adder->SetInput2( image );
+    adder->Update();
+    template_vol = adder->GetOutput();
+  }
+
+  /* Divide template_vol by the weight */
+  MultiplyByConstantType::Pointer  multiplier = MultiplyByConstantType::New();
+  multiplier->SetConstant( 1.0/args.volumeFileNames.size() );
+  multiplier->SetInput( template_vol );
+  multiplier->Update();
+  template_vol = multiplier->GetOutput();
+
+  /* Write the template_vol to disk (e.g. template0.nii.gz) */
+  std::stringstream template_name;
+  template_name << "template0" << ".nii.gz";
+  writer->SetFileName( template_name.str() );
+  writer->SetUseCompression( true );
+  writer->SetInput( template_vol );
+  try
+  {
+    writer->Update();
+  }
+  catch( itk::ExceptionObject& err )
+  {
+    std::cout << "Unexpected error." << std::endl;
+    std::cout << err << std::endl;
+    exit( EXIT_FAILURE );
+  }
+}
+
+
+
+void ComputeTemplateWarps( arguments args, int iter)
+{
+  if (iter == 0)
+  {
+    ComputeMean( args );
+    return;
+  }
+
+  typedef itk::DisplacementFieldJacobianDeterminantFilter <DeformationFieldType, float>    JacobianDeterminantFilterType;
+
+  JacobianDeterminantFilterType::Pointer jacdetfilter = JacobianDeterminantFilterType::New();
+
+  ImageReaderType::Pointer         imageReader = ImageReaderType::New();
+  DeformationReaderType::Pointer   defFieldReader = DeformationReaderType::New();
+  WriterType::Pointer              writer =  WriterType::New();
+  AdderType::Pointer               adder = AdderType::New();
+  AdderType::Pointer               adder2 = AdderType::New();
+  WarperType::Pointer              warper = WarperType::New();
+  ImageType::Pointer 			        jacobianimage = ImageType::New();
+  ImageType::Pointer               template_vol =  ImageType::New();
+  ImageType::Pointer               jacobian = 0;
+  ImageType::Pointer               image = 0;
+  ImageType::Pointer               weight = ImageType::New();
+
+
+  for (unsigned int i=0; i < args.volumeFileNames.size(); i++)
+  {
+    imageReader->SetFileName( args.volumeFileNames[i] );
+    try
+    {
+      imageReader->Update();
+    }
+    catch( itk::ExceptionObject& err )
+    {
+      std::cout << "Could not read one of the input images." << std::endl;
+      std::cout << err << std::endl;
+      exit( EXIT_FAILURE );
+    }
+    image = imageReader->GetOutput();
+
+    if (i==0)
+    {
+      MakeZeroVolume(template_vol, image);
+      MakeZeroVolume(weight, image);
+    }
+
+    /* Read in the current image's warp */
+    std::stringstream deformation_name;
+    deformation_name << args.volumeFileNames[i] << "_" << iter-1 << "_deformation.nii.gz";
+    defFieldReader->SetFileName( deformation_name.str() );
+    try
+    {
+      defFieldReader->Update();
+    }
+    catch( itk::ExceptionObject& err )
+    {
+      std::cout << "Could not read one of the deformation fields." << std::endl;
+      std::cout << err << std::endl;
+      exit( EXIT_FAILURE );
+    }
+
+    /* Warp the image */
+    warper->SetInput( image );
+    warper->SetOutputSpacing( image->GetSpacing() );
+    warper->SetOutputOrigin( image->GetOrigin() );
+    warper->SetOutputDirection( image->GetDirection() );
+    warper->SetDeformationField( defFieldReader->GetOutput() );
+    image = warper->GetOutput();
+
+    /* Write the warped image to disk */
+    std::stringstream warped_image_name;
+    warped_image_name << args.volumeFileNames[i] << "_" << iter-1 << "_warped.nii.gz";
+    writer->SetFileName( warped_image_name.str() );
+    writer->SetUseCompression( true );
+    writer->SetInput( image );
+    try
+    {
+      writer->Update();
+    }
+    catch( itk::ExceptionObject& err )
+    {
+      std::cout << "Could not write warped image to disk." << std::endl;
+      std::cout << err << std::endl;
+      exit( EXIT_FAILURE );
+    }
+
+    /* Compute the jacobian of the warp and add to the running total (weight) */
+    jacdetfilter->SetInput( defFieldReader->GetOutput() );
+    jacdetfilter->SetUseImageSpacing( false );
+    jacdetfilter->UpdateLargestPossibleRegion();
+    adder2->SetInput1( weight );
+    adder2->SetInput2( jacdetfilter->GetOutput() );
+    adder2->Update();
+    weight = adder2->GetOutput();
+
+    /* Add the image to the running total (template_vol) */
+    adder->SetInput1( template_vol );
+    adder->SetInput2( image );
+    adder->Update();
+    template_vol = adder->GetOutput();
+  }
+
+  /* Divide template_vol by the weight */
+    DivideByImageType::Pointer  divider = DivideByImageType::New();
+    divider->SetInput1( template_vol );
+    divider->SetInput2( weight );
+    divider->Update();
+    template_vol = divider->GetOutput();
+
+  /* Write the template_vol to disk (e.g. template0.nii.gz) */
+  std::stringstream template_name;
+  template_name << "template" << iter << ".nii.gz";
+  writer->SetFileName( template_name.str() );
+  writer->SetUseCompression( true );
+  writer->SetInput( template_vol );
+  try
+  {
+    writer->Update();
+  }
+  catch( itk::ExceptionObject& err )
+  {
+    std::cout << "Unexpected error." << std::endl;
+    std::cout << err << std::endl;
+    exit( EXIT_FAILURE );
+  }
+
+}
+
 
 void ComputeTemplate( arguments args, int iter, bool useWarps )
 {
@@ -493,15 +704,16 @@ void ComputeTemplate( arguments args, int iter, bool useWarps )
     /* Initialize template_vol as a zero volume */
     if (i==0)
     {
-      region.SetSize( image->GetLargestPossibleRegion().GetSize() );
-      start.Fill(0);
-      region.SetIndex( start );
-      template_vol->SetDirection( image->GetDirection() );
-      template_vol->SetOrigin( image->GetOrigin() );
-      template_vol->SetSpacing( image->GetSpacing());
-      template_vol->SetRegions( region );
-      template_vol->Allocate();
-      template_vol->FillBuffer( 0.0 );
+      MakeZeroVolume(template_vol, image);
+      //region.SetSize( image->GetLargestPossibleRegion().GetSize() );
+      //start.Fill(0);
+      //region.SetIndex( start );
+      //template_vol->SetDirection( image->GetDirection() );
+      //template_vol->SetOrigin( image->GetOrigin() );
+      //template_vol->SetSpacing( image->GetSpacing());
+      //template_vol->SetRegions( region );
+      //template_vol->Allocate();
+      //template_vol->FillBuffer( 0.0 );
     }
 
     if (useWarps)
@@ -821,7 +1033,7 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
   DeformationFieldType::Pointer field = 0;
   //{//for mem allocations
 
-  ComputeTemplate(args, 0, false);
+  ComputeTemplateWarps(args, 0);
 
   for (unsigned int j = 0; j < args.numOuterIterations; ++j)
   {
@@ -870,17 +1082,17 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
         std::cout << err << std::endl;
         exit( EXIT_FAILURE );
       }
-      field = multires->GetOutput();
-      field->DisconnectPipeline();
+      //field = multires->GetOutput();
+      //field->DisconnectPipeline();
 
-      WriteNthDeformationField(field, args.volumeFileNames[i], j);
-
-      
-    } // end for each image
+      //WriteNthDeformationField(field, args.volumeFileNames[i], j);
+      WriteNthDeformationField(multires->GetOutput(), args.volumeFileNames[i], j);
+    } 
 
     NormalizeWarps(args, j);
 
-    ComputeTemplate(args, j+1, true);
+    //ComputeTemplate(args, j+1, true);
+    ComputeTemplateWarps(args, j+1);
   }
   
 

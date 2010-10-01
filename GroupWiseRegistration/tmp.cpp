@@ -348,3 +348,134 @@ defWriter->SetFileName( deformation_name.str() );
       deformation_name.str("");
       deformation_name << args.volumeFileNames[i] << "_" << j << "_" "deformation-orig.nii.gz";
 
+
+
+tionField(DeformationFieldType::Pointer image, std::string filename)
+  +{
+    +  DeformationWriterType::Pointer  writer =  DeformationWriterType::New();
+    +  writer->SetFileName(filename);
+    +  writer->SetInput( image  );
+    +  writer->SetUseCompression( true );
+    +  try
+      +  {
+        +    writer->Update();
+        +  }
+        +  catch( itk::ExceptionObject& err )
+          +  {
+            +    std::cout << "Unexpected error." << std::endl;
+            +    std::cout << err << std::endl;
+            +    exit( EXIT_FAILURE );
+            +  }
+            +}
+            +
+            +void WriteNthField(DeformationFieldType::Pointer field, std::string image_name, int i)
+  +{
+    +  std::stringstream deformation_name;
+    +  deformation_name << image_name << "_" << i << "_" "deformation.nii.gz";
+    +  WriteDeformationField(field, deformation_name.str());
+    +  deformation_name.str("");
+    +  deformation_name << image_name << "_" << i << "_" "deformation-orig.nii.gz";
+    +  WriteDeformationField(field, deformation_name.str());
+    +}
+    +
+    +
+    +ImageType::Pointer ReadImage(std::string filename, std::string error_message)
+  +{
+    +  ImageType::Pointer result = 0;
+    +
+      +  ImageReaderType::Pointer imageReader = ImageReaderType::New();
+    +  imageReader->SetFileName(filename);
+    +  try
+      +  {
+        +    imageReader->Update();
+        +  }
+        +  catch( itk::ExceptionObject& err )
+          +  {
+            +    std::cout << error_message << std::endl;
+            +    std::cout << err << std::endl;
+            +    exit( EXIT_FAILURE );
+            +  }
+            +  result = imageReader->GetOutput();
+            +  result->DisconnectPipeline();
+            +  return result;
+            +}
+            +
+            +
+            +DeformationFieldType::Pointer ReadField(std::string filename, std::string error_message)
+  +{
+    +  DeformationFieldType::Pointer result = 0;
+    +
+      +  DeformationReaderType::Pointer imageReader = DeformationReaderType::New();
+    +  imageReader->SetFileName(filename);
+    +  try
+      +  {
+        +    imageReader->Update();
+        +  }
+        +  catch( itk::ExceptionObject& err )
+          +  {
+            +    std::cout << error_message << std::endl;
+            +    std::cout << err << std::endl;
+            +    exit( EXIT_FAILURE );
+            +  }
+            +  result = imageReader->GetOutput();
+            +  result->DisconnectPipeline();
+            +  return result;
+            +}
+            +
+            +void
+            +ZeroVolume(void * pimg, ImageType::Pointer image)
+  +{
+    +  ImageType::Pointer *result = (ImageType::Pointer *) pimg;
+    +  ImageType::RegionType            region;
+    +  ImageType::IndexType             start;
+    +  region.SetSize( image->GetLargestPossibleRegion().GetSize() );
+    +  start.Fill(0);
+    +  region.SetIndex( start );
+    +  (*result)->SetDirection( image->GetDirection() );
+    +  (*result)->SetOrigin( image->GetOrigin() );
+    +  (*result)->SetSpacing( image->GetSpacing());
+    +  (*result)->SetRegions( region );
+    +  (*result)->Allocate();
+    +  (*result)->FillBuffer( 0.0 );
+    +}
+    +
+    +std::string
+    +FieldName(std::string image_name, int i)
+  +{
+    +  std::stringstream result;
+    +  result << image_name << "_" << i << "_deformation.nii.gz";
+    +  return result.str();
+    +}
+    +
+    +//DeformationReaderType::Pointer
+    +//GetFieldReader(std::string image_name, int i)
+    +//{
+    +  //DeformationFieldType::Pointer result = 0;
+    +
+    +  //DeformationReaderType::Pointer imageReader = DeformationReaderType::New();
+    +  //imageReader->SetFileName(filename);
+    +  //try
+    +  //{
+    +    //imageReader->Update();
+    +  //}
+    +  //catch( itk::ExceptionObject& err )
+    +  //{
+    +    //std::cout << error_message << std::endl;
+    +    //std::cout << err << std::endl;
+    +    //exit( EXIT_FAILURE );
+    +  //}
+    +  //result = imageReader->GetOutput();
+    +  //result->DisconnectPipeline();
+    +  //return result;
+    +//}
+    +
+    +
+    +std::string
+    +WarpedImageName(std::string filename, int i)
+  +{
+    +  std::stringstream result;
+    +  result << filename << "_" << i << "_warped.nii.gz";
+    +  return result.str();
+    +}
+    +
+
