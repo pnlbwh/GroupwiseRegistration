@@ -479,8 +479,8 @@ ReadImage(ImageReaderType::Pointer &reader, std::string filename)
   }
 }
 
-ImageType::Pointer 
-GetImage(std::string filename)
+
+ImageType::Pointer GetImage(std::string filename)
 {
   ImageType::Pointer result;
   ImageReaderType::Pointer imageReader = ImageReaderType::New();
@@ -500,59 +500,57 @@ GetImage(std::string filename)
   return result;
 }
 
+
+std::string TemplateName(int i)
+{
+  std::stringstream result;
+  result << "template" << i << ".nii.gz";
+  return result.str();
+}
+
+void UpdateWriter(WriterType::Pointer &writer, std::string error_msg)
+{
+try
+  {
+    writer->Update();
+  }
+  catch( itk::ExceptionObject& err )
+  {
+    std::cout << error_msg << std::endl;
+    std::cout << err << std::endl;
+    exit( EXIT_FAILURE );
+  }
+}
+
+
 void ComputeMean( arguments args )
 {
-  ImageReaderType::Pointer    imageReader = ImageReaderType::New();
-  WriterType::Pointer         writer =  WriterType::New();
   AdderType::Pointer          adder = AdderType::New();
-  AdderType::Pointer          adder2 = AdderType::New();
   ImageType::Pointer          template_vol =  ImageType::New();
   ImageType::Pointer          image;
 
   for (unsigned int i=0; i < args.volumeFileNames.size(); i++)
   {
     image = GetImage(args.volumeFileNames[i]);
-    //ReadImage(imageReader, args.volumeFileNames[i]);
-    //image = imageReader->GetOutput();
 
-
-    /* Initialize template_vol as a zero volume */
     if (i==0)
     {
       MakeZeroVolume(template_vol, image);
     }
-
-
-    /* Add the image to the running total (template_vol) */
     adder->SetInput1( template_vol );
     adder->SetInput2( image );
     adder->Update();
     template_vol = adder->GetOutput();
   }
 
-  /* Divide template_vol by the weight */
   MultiplyByConstantType::Pointer  multiplier = MultiplyByConstantType::New();
   multiplier->SetConstant( 1.0/args.volumeFileNames.size() );
   multiplier->SetInput( template_vol );
-  multiplier->Update();
-  template_vol = multiplier->GetOutput();
-
-  /* Write the template_vol to disk (e.g. template0.nii.gz) */
-  std::stringstream template_name;
-  template_name << "template0" << ".nii.gz";
-  writer->SetFileName( template_name.str() );
+  WriterType::Pointer         writer =  WriterType::New();
+  writer->SetFileName( TemplateName(0) );
   writer->SetUseCompression( true );
-  writer->SetInput( template_vol );
-  try
-  {
-    writer->Update();
-  }
-  catch( itk::ExceptionObject& err )
-  {
-    std::cout << "Unexpected error." << std::endl;
-    std::cout << err << std::endl;
-    exit( EXIT_FAILURE );
-  }
+  writer->SetInput( multiplier->GetOutput() );
+  UpdateWriter(writer, "Could not write template to disk");
 }
 
 
@@ -849,12 +847,6 @@ void SetFilterSmoothing(ActualRegistrationFilterType::Pointer filter, float sigm
 }
 
 
-std::string TemplateName(int i)
-{
-  std::stringstream result;
-  result << "template" << i << ".nii.gz";
-  return result.str();
-}
 
 void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], std::string resultsDirectory, std::string outputVolume, bool useJacFlag )
 {
