@@ -446,8 +446,8 @@ protected:
    }
 };
 
-void
-MakeZeroVolume(ImageType::Pointer &template_vol, ImageType::Pointer image)
+
+void MakeZeroVolume(ImageType::Pointer &template_vol, ImageType::Pointer image)
 {
   ImageType::RegionType            region;
   ImageType::IndexType             start;
@@ -460,22 +460,6 @@ MakeZeroVolume(ImageType::Pointer &template_vol, ImageType::Pointer image)
       template_vol->SetRegions( region );
       template_vol->Allocate();
       template_vol->FillBuffer( 0.0 );
-}
-
-
-void ReadImage(ImageReaderType::Pointer &reader, std::string filename)
-{
-  reader->SetFileName( filename );
-  try
-  {
-    reader->Update();
-  }
-  catch( itk::ExceptionObject& err )
-  {
-    std::cout << "Could not load image from disk." << std::endl;
-    std::cout << err << std::endl;
-    exit( EXIT_FAILURE );
-  }
 }
 
 
@@ -504,6 +488,7 @@ std::string TemplateName(int i)
   result << "template" << i << ".nii.gz";
   return result.str();
 }
+
 
 void UpdateWriter(WriterType::Pointer &writer, std::string error_msg)
 {
@@ -567,6 +552,14 @@ std::string WarpedImageName(std::string imageName, int i)
   return result.str();
 }
 
+void ConfigureWarper(WarperType::Pointer& warper, ImageType::Pointer image)
+{
+  warper->SetInput( image );
+  warper->SetOutputSpacing( image->GetSpacing() );
+  warper->SetOutputOrigin( image->GetOrigin() );
+  warper->SetOutputDirection( image->GetDirection() );
+}
+
 
 void ComputeTemplateFromWarps( std::vector<std::string> filenames, int iter )
 {
@@ -586,25 +579,25 @@ void ComputeTemplateFromWarps( std::vector<std::string> filenames, int iter )
 
   for (unsigned int i=0; i < filenames.size(); i++)
   {
+    std::string field_name = FieldName(filenames[i], iter-1);
+    std::string warped_image_name = WarpedImageName(filenames[i], iter-1);
     GetImage(filenames[i], image);
     if (i==0)
     {
       MakeZeroVolume(imgSum, image);
       MakeZeroVolume(jacDetSum, image);
     }
-    fieldReader->SetFileName( FieldName(filenames[i], iter-1) );
-    warper->SetInput( image );
-    warper->SetOutputSpacing( image->GetSpacing() );
-    warper->SetOutputOrigin( image->GetOrigin() );
-    warper->SetOutputDirection( image->GetDirection() );
+    fieldReader->SetFileName( field_name );
     warper->SetDeformationField( fieldReader->GetOutput() );
-    writer->SetFileName( WarpedImageName(filenames[i], iter-1) );
+    ConfigureWarper(warper, image);
+    
+    writer->SetFileName( warped_image_name );
     writer->SetInput( warper->GetOutput() );
     UpdateWriter(writer, "Could not write warped image to disk");
 
     //jacdetfilter->UpdateLargestPossibleRegion();
-    jacDetAdder->SetInput1( jacDetSum );
     jacdetfilter->SetInput( fieldReader->GetOutput() );
+    jacDetAdder->SetInput1( jacDetSum );
     jacDetAdder->SetInput2( jacdetfilter->GetOutput() );
     jacDetAdder->Update();
     jacDetSum = jacDetAdder->GetOutput();
@@ -789,7 +782,7 @@ void WriteNthDeformationField(DeformationFieldType::Pointer field, std::string i
 }
 
 
-void SetFilterSmoothing(ActualRegistrationFilterType::Pointer filter, float sigmaDef, float sigmaDiff, float sigmaUp)
+void SetFilterSmoothing(ActualRegistrationFilterType::Pointer& filter, float sigmaDef, float sigmaDiff, float sigmaUp)
 {
   if ( sigmaDef > 0.1 ) // if ( args.sigmaDef > 0.1 )
   {
@@ -808,6 +801,21 @@ void SetFilterSmoothing(ActualRegistrationFilterType::Pointer filter, float sigm
     filter->SmoothUpdateFieldOff();
 }
 
+
+void ConfigureFilter(ActualRegistrationFilterType::Pointer& filter, arguments args)
+{
+  filter->SetMaximumUpdateStepLength( 2.0 );
+  filter->SetUseGradientType( DemonsRegistrationFunctionType::Symmetric ); //Symmetric is used in ESMInvConDemonsRegistrationFunction 
+  SetFilterSmoothing(filter, args.initialSigmaDiff, args.initialSigmaDiff, args.sigmaUp);    
+}
+
+
+void ConfigureMultiResFilter(MultiResRegistrationFilterType::Pointer& multires, arguments args)
+{
+  multires->SetNumberOfLevels( args.numLevels );
+  std::vector<unsigned int> numIterationsVector= std::vector<unsigned int>(args.numLevels, args.numIterations);
+  multires->SetNumberOfIterations( &numIterationsVector[0]); // multires->SetNumberOfIterations( &args.numIterations[0] );
+}
 
 
 void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], std::string resultsDirectory, std::string outputVolume, bool useJacFlag )
@@ -842,21 +850,17 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
       imageReader->SetFileName( args.volumeFileNames[i] );
       
       filter = ActualRegistrationFilterType::New();
-      filter->SetMaximumUpdateStepLength( 2.0 );
-      filter->SetUseGradientType( DemonsRegistrationFunctionType::Symmetric ); //Symmetric is used in ESMInvConDemonsRegistrationFunction 
-      SetFilterSmoothing(filter, args.initialSigmaDiff, args.initialSigmaDiff, args.sigmaUp);    
-      
+      ConfigureFilter(filter, args);
+
       MultiResRegistrationFilterType::Pointer multires = MultiResRegistrationFilterType::New();
       multires->SetRegistrationFilter( filter );
-      multires->SetNumberOfLevels( args.numLevels );
-      std::vector<unsigned int> numIterationsVector= std::vector<unsigned int>(args.numLevels, args.numIterations);
-      multires->SetNumberOfIterations( &numIterationsVector[0]); // multires->SetNumberOfIterations( &args.numIterations[0] );
+      ConfigureMultiResFilter(multires, args);
 
       if ( args.verbosity > 0 )
       {      
         CommandIterationUpdate<PixelType, Dimension>::Pointer observer = CommandIterationUpdate<PixelType, Dimension>::New();
-        filter->AddObserver( itk::IterationEvent(), observer );
         CommandIterationUpdate<PixelType, Dimension>::Pointer multiresobserver = CommandIterationUpdate<PixelType, Dimension>::New();
+        filter->AddObserver( itk::IterationEvent(), observer );
         multires->AddObserver( itk::IterationEvent(), multiresobserver );
       }
 
@@ -876,7 +880,7 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
       //field->DisconnectPipeline();
       //WriteNthDeformationField(field, args.volumeFileNames[i], j);
       //WriteNthDeformationField(multires->GetOutput(), args.volumeFileNames[i], j);
-      WriteDeformationField(multires->GetOutput(), DeformationName(args.volumeFileNames[i], j));
+      WriteDeformationField( multires->GetOutput(), DeformationName(args.volumeFileNames[i], j) );
       /*DEBUG*/
       std::stringstream deformation_name;
       deformation_name << args.volumeFileNames[i] << "_" << j << "_" "deformation-orig.nii.gz";
@@ -885,7 +889,6 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
     } 
 
     NormalizeWarps(args.volumeFileNames, j);
-
     ComputeTemplate(args.volumeFileNames, j+1);
   }
   
