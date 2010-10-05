@@ -447,19 +447,19 @@ protected:
 };
 
 
-void MakeZeroVolume(ImageType::Pointer &template_vol, ImageType::Pointer image)
+void MakeZeroVolume(ImageType::Pointer &zero_image, ImageType::Pointer image)
 {
   ImageType::RegionType            region;
   ImageType::IndexType             start;
   region.SetSize( image->GetLargestPossibleRegion().GetSize() );
   start.Fill(0);
   region.SetIndex( start );
-  template_vol->SetDirection( image->GetDirection() );
-  template_vol->SetOrigin( image->GetOrigin() );
-  template_vol->SetSpacing( image->GetSpacing());
-      template_vol->SetRegions( region );
-      template_vol->Allocate();
-      template_vol->FillBuffer( 0.0 );
+  zero_image->SetDirection( image->GetDirection() );
+  zero_image->SetOrigin( image->GetOrigin() );
+  zero_image->SetSpacing( image->GetSpacing());
+  zero_image->SetRegions( region );
+  zero_image->Allocate();
+  zero_image->FillBuffer( 0.0 );
 }
 
 
@@ -512,9 +512,13 @@ void ComputeMean( std::vector<std::string> filenames, std::string filename)
   ImageType::Pointer          template_vol =  ImageType::New();
   ImageType::Pointer          image;
 
+  std::cout << "Computing mean:" << std::endl;
   for (unsigned int i=0; i < filenames.size(); i++)
   {
+    std::cout << filenames[i] << std::endl;
+
     GetImage(filenames[i], image);
+    std::cout << image->GetOrigin() << std::endl;
 
     if (i==0)
     {
@@ -629,9 +633,9 @@ void ComputeTemplate( std::vector<std::string> filenames, int iter )
 
 void NormalizeWarps( std::vector<std::string> filenames, int iter )
 {
-  DeformationWriterType::Pointer                writer =  DeformationWriterType::New();
-  DeformationReaderType::Pointer     defFieldReader = DeformationReaderType::New();
-  DeformationAdderType::Pointer      adder = DeformationAdderType::New();
+  DeformationWriterType::Pointer    writer =  DeformationWriterType::New();
+  DeformationReaderType::Pointer    defFieldReader = DeformationReaderType::New();
+  DeformationAdderType::Pointer     adder = DeformationAdderType::New();
   DeformationFieldType::Pointer     avg_def = DeformationFieldType::New();
   DeformationFieldType::Pointer     image;
   DeformationFieldType::RegionType  region;
@@ -770,27 +774,17 @@ std::string DeformationName(std::string filename, int i)
 }
 
 
-void WriteNthDeformationField(DeformationFieldType::Pointer field, std::string image_name, int i)
+void SetFilterSmoothing(ActualRegistrationFilterType::Pointer& filter, float sigmaDiff, float sigmaUp)
 {
-  WriteDeformationField(field, DeformationName(image_name, i));
-
-  /*DEBUG*/
-  std::stringstream deformation_name;
-  deformation_name << image_name << "_" << i << "_" "deformation-orig.nii.gz";
-  WriteDeformationField(field, deformation_name.str());
-  /*DEBUG*/
-}
-
-
-void SetFilterSmoothing(ActualRegistrationFilterType::Pointer& filter, float sigmaDef, float sigmaDiff, float sigmaUp)
-{
-  if ( sigmaDef > 0.1 ) // if ( args.sigmaDef > 0.1 )
+  if ( sigmaDiff > 0.1 ) // if ( args.sigmaDef > 0.1 )
   {
     filter->SmoothDeformationFieldOn();
     filter->SetStandardDeviations( sigmaDiff );  //TODO Update with a range
   }
   else
+  {
     filter->SmoothDeformationFieldOff();
+  }
 
   if ( sigmaUp > 0.1 )
   {
@@ -798,15 +792,17 @@ void SetFilterSmoothing(ActualRegistrationFilterType::Pointer& filter, float sig
     filter->SetUpdateFieldStandardDeviations( sigmaUp );
   }
   else
+  {
     filter->SmoothUpdateFieldOff();
+  }
 }
 
 
-void ConfigureFilter(ActualRegistrationFilterType::Pointer& filter, arguments args)
+void ConfigureFilter(ActualRegistrationFilterType::Pointer& filter, float sigmaDiff, float sigmaUp)
 {
   filter->SetMaximumUpdateStepLength( 2.0 );
   filter->SetUseGradientType( DemonsRegistrationFunctionType::Symmetric ); //Symmetric is used in ESMInvConDemonsRegistrationFunction 
-  SetFilterSmoothing(filter, args.initialSigmaDiff, args.initialSigmaDiff, args.sigmaUp);    
+  SetFilterSmoothing(filter, sigmaDiff, sigmaUp);    
 }
 
 
@@ -815,6 +811,22 @@ void ConfigureMultiResFilter(MultiResRegistrationFilterType::Pointer& multires, 
   multires->SetNumberOfLevels( args.numLevels );
   std::vector<unsigned int> numIterationsVector= std::vector<unsigned int>(args.numLevels, args.numIterations);
   multires->SetNumberOfIterations( &numIterationsVector[0]); // multires->SetNumberOfIterations( &args.numIterations[0] );
+}
+
+
+std::vector<float> Range(float initial, float final, int num)
+{  
+  float delta = (initial - final)/(num - 1);
+  std::vector<float> result(num, 0.0);
+  if (delta < 0.0)
+  {
+    delta = 0.0;
+  }
+  for (unsigned int i = 0; i < num; ++i)
+  {
+    result[i] = initial - i * delta;
+  }
+  return result;
 }
 
 
@@ -830,6 +842,8 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
   ImageType::Pointer template_vol = 0; 
   DeformationFieldType::Pointer field = 0;
   //{//for mem allocations
+
+  std::vector<float> sigma_diff = Range(args.initialSigmaDiff, args.finalSigmaDiff, args.numOuterIterations);
 
   ComputeTemplate(args.volumeFileNames, 0);
 
@@ -850,11 +864,14 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
       imageReader->SetFileName( args.volumeFileNames[i] );
       
       filter = ActualRegistrationFilterType::New();
-      ConfigureFilter(filter, args);
+      ConfigureFilter(filter, sigma_diff[j], args.sigmaUp);
+      std::cout << "sigma_diff[" << j << "] = " << sigma_diff[j] << std::endl;
 
       MultiResRegistrationFilterType::Pointer multires = MultiResRegistrationFilterType::New();
       multires->SetRegistrationFilter( filter );
       ConfigureMultiResFilter(multires, args);
+      multires->SetFixedImage( template_vol );
+      multires->SetMovingImage( imageReader->GetOutput() );
 
       if ( args.verbosity > 0 )
       {      
@@ -864,8 +881,6 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
         multires->AddObserver( itk::IterationEvent(), multiresobserver );
       }
 
-      multires->SetFixedImage( template_vol );
-      multires->SetMovingImage( imageReader->GetOutput() );
       try
       {
         multires->UpdateLargestPossibleRegion();
@@ -876,11 +891,9 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
         std::cout << err << std::endl;
         exit( EXIT_FAILURE );
       }
-      //field = multires->GetOutput();
-      //field->DisconnectPipeline();
-      //WriteNthDeformationField(field, args.volumeFileNames[i], j);
-      //WriteNthDeformationField(multires->GetOutput(), args.volumeFileNames[i], j);
+
       WriteDeformationField( multires->GetOutput(), DeformationName(args.volumeFileNames[i], j) );
+
       /*DEBUG*/
       std::stringstream deformation_name;
       deformation_name << args.volumeFileNames[i] << "_" << j << "_" "deformation-orig.nii.gz";

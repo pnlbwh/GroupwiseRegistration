@@ -4,6 +4,8 @@
 
 #include "itkSmoothingRecursiveGaussianImageFilter.h"
 
+#include <itkImageDuplicator.h>
+
 namespace itk {
 
 /*
@@ -61,13 +63,31 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
     itkExceptionMacro(<<"FiniteDifferenceFunction not of type DemonsRegistrationFunctionType");
   }
 
-  /* Initialize the inverse deformation field as zeros */
   if (this->GetInvDeformationField() == NULL)
   {
-    this->SetInvDeformationField( this->GetDeformationField() ); //should be zeros
+    typedef ImageDuplicator<TDeformationField> DuplicatorType;
+    typename DuplicatorType::Pointer duplicator = DuplicatorType::New();
+    duplicator->SetInputImage(this->GetDeformationField());
+    duplicator->Update();
+    m_invDeformationField = duplicator->GetOutput();
+    m_invDeformationField->FillBuffer(itk::NumericTraits< typename TDeformationField::PixelType >::Zero);
+    //typename TDeformationField::RegionType            region;
+    //typename TDeformationField::IndexType             start;
+    //region.SetSize( this->GetDeformationField()->GetLargestPossibleRegion().GetSize() );
+    //start.Fill(0);
+    //region.SetIndex( start );
+    //m_invDeformationField->SetDirection( this->GetDeformationField()->GetDirection() );  //this causes a seg fault 
+    //m_invDeformationField->SetOrigin( this->GetDeformationField()->GetOrigin() );
+    //m_invDeformationField->SetSpacing( this->GetDeformationField()->GetSpacing());
+
+    //m_invDeformationField->SetRegions( region );
+    //m_invDeformationField->Allocate();
+    //m_invDeformationField->FillBuffer( 0.0 );
+
+    //this->SetInvDeformationField( );
+    //this->SetInvDeformationField( this->GetDeformationField() ); //should be zeros
   }
 
-  /* Set the registration function's deformation field and its inverse */
   f->SetDeformationField( this->GetDeformationField() ); 
   f->SetInvDeformationField( this->GetInvDeformationField() );
 
