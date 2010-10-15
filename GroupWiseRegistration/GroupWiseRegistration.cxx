@@ -570,7 +570,6 @@ void ComputeTemplateFromWarps( std::vector<std::string> filenames, int iter )
   typedef itk::DisplacementFieldJacobianDeterminantFilter <DeformationFieldType, float>    JacobianDeterminantFilterType;
   JacobianDeterminantFilterType::Pointer jacdetfilter = JacobianDeterminantFilterType::New();
   jacdetfilter->SetUseImageSpacing( false );
-  ImageReaderType::Pointer         imageReader = ImageReaderType::New();
   DeformationReaderType::Pointer   fieldReader = DeformationReaderType::New();
   WriterType::Pointer              writer =  WriterType::New();
   writer->SetUseCompression( true );
@@ -834,16 +833,14 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
 {
   WriterType::Pointer                    writer =  WriterType::New();
   ImageReaderType::Pointer               imageReader = ImageReaderType::New();
-
   ActualRegistrationFilterType::Pointer  filter;
-
   std::stringstream deformation_name;
-
   ImageType::Pointer template_vol = 0; 
   DeformationFieldType::Pointer field = 0;
+  std::vector<float> sigma_diff = Range(args.initialSigmaDiff, args.finalSigmaDiff, args.numOuterIterations);
+
   //{//for mem allocations
 
-  std::vector<float> sigma_diff = Range(args.initialSigmaDiff, args.finalSigmaDiff, args.numOuterIterations);
 
   ComputeTemplate(args.volumeFileNames, 0);
 

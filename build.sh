@@ -1,6 +1,6 @@
 #!/bin/bash
 
-dir="slicer3-6/Slicer3/Applications/CLI/GroupWiseRegistration"
+dir="../slicer3-6/Slicer3/Applications/CLI/GroupWiseRegistration"
 
 if [ ! -e $dir ]; then
   mkdir $dir
