@@ -447,6 +447,37 @@ protected:
 };
 
 
+void SetSpacing(ImageType::Pointer& image)
+{
+  ImageType::SpacingType spacing;                                                                                                                                                                                   
+  spacing.Fill( 1.0 );
+  ImageType::PointType origin;
+  origin.Fill( 0.0 );
+
+  image->SetOrigin( origin );
+  image->SetSpacing( spacing );
+
+}
+
+void MakeZeroDeformation(DeformationFieldType::Pointer &zero_image, DeformationFieldType::Pointer image)
+{
+  DeformationFieldType::RegionType            region;
+  DeformationFieldType::IndexType             start;
+  region.SetSize( image->GetLargestPossibleRegion().GetSize() );
+  start.Fill(0);
+  region.SetIndex( start );
+  zero_image->SetDirection( image->GetDirection() );
+  zero_image->SetOrigin( image->GetOrigin() );
+  zero_image->SetSpacing( image->GetSpacing());
+  zero_image->SetRegions( region );
+  zero_image->Allocate();
+  zero_image->FillBuffer( 0.0 );
+
+  //SetSpacing(zero_image);
+}
+
+
+
 void MakeZeroVolume(ImageType::Pointer &zero_image, ImageType::Pointer image)
 {
   ImageType::RegionType            region;
@@ -460,8 +491,9 @@ void MakeZeroVolume(ImageType::Pointer &zero_image, ImageType::Pointer image)
   zero_image->SetRegions( region );
   zero_image->Allocate();
   zero_image->FillBuffer( 0.0 );
-}
 
+  //SetSpacing(zero_image);
+}
 
 void GetImage(std::string filename, ImageType::Pointer& image)
 {
@@ -479,6 +511,8 @@ void GetImage(std::string filename, ImageType::Pointer& image)
   }
   image = imageReader->GetOutput();
   image->DisconnectPipeline();
+
+  //SetSpacing(image);
 }
 
 
@@ -541,10 +575,10 @@ void ComputeMean( std::vector<std::string> filenames, std::string filename)
 }
 
 
-std::string FieldName(std::string imageName, int i)
+std::string DeformationName(std::string filename, int i)
 {
   std::stringstream result;
-  result << imageName << "_" << i << "_deformation.nii.gz";
+  result << filename << "_" << i << "_" "deformation.nii.gz";
   return result.str();
 }
 
@@ -582,7 +616,6 @@ void ComputeTemplateFromWarps( std::vector<std::string> filenames, int iter )
 
   for (unsigned int i=0; i < filenames.size(); i++)
   {
-    std::string field_name = FieldName(filenames[i], iter-1);
     std::string warped_image_name = WarpedImageName(filenames[i], iter-1);
     GetImage(filenames[i], image);
     if (i==0)
@@ -590,7 +623,7 @@ void ComputeTemplateFromWarps( std::vector<std::string> filenames, int iter )
       MakeZeroVolume(imgSum, image);
       MakeZeroVolume(jacDetSum, image);
     }
-    fieldReader->SetFileName( field_name );
+    fieldReader->SetFileName( DeformationName(filenames[i], iter-1) );
     warper->SetDeformationField( fieldReader->GetOutput() );
     ConfigureWarper(warper, image);
     
@@ -637,15 +670,10 @@ void NormalizeWarps( std::vector<std::string> filenames, int iter )
   DeformationAdderType::Pointer     adder = DeformationAdderType::New();
   DeformationFieldType::Pointer     avg_def = DeformationFieldType::New();
   DeformationFieldType::Pointer     image;
-  DeformationFieldType::RegionType  region;
-  DeformationFieldType::IndexType   start;
 
   for (unsigned int i=0; i < filenames.size(); i++)
   {
-    /* Read in the current image's warp */
-    std::stringstream deformation_name;
-    deformation_name << filenames[i] << "_" << iter << "_deformation.nii.gz";
-    defFieldReader->SetFileName( deformation_name.str() );
+    defFieldReader->SetFileName(DeformationName(filenames[i], iter));
     try
     {
       defFieldReader->Update();
@@ -654,21 +682,13 @@ void NormalizeWarps( std::vector<std::string> filenames, int iter )
     {
       std::cout << "Could not read one of the deformation fields." << std::endl;
       std::cout << err << std::endl;
-      exit( EXIT_FAILURE );
+     exit( EXIT_FAILURE );
     }
     image = defFieldReader->GetOutput();
 
     if (i==0)
     {
-      region.SetSize( image->GetLargestPossibleRegion().GetSize() );
-      start.Fill(0);
-      region.SetIndex( start );
-      avg_def->SetDirection( image->GetDirection() );
-      avg_def->SetOrigin( image->GetOrigin() );
-      avg_def->SetSpacing( image->GetSpacing() );
-      avg_def->SetRegions( region );
-      avg_def->Allocate();
-      avg_def->FillBuffer( 0.0 );
+      MakeZeroDeformation(avg_def, image);
     }
 
     adder->SetInput1( avg_def );
@@ -687,7 +707,7 @@ void NormalizeWarps( std::vector<std::string> filenames, int iter )
   avg_def = multiplier->GetOutput();
 
 
-  /* DEBUG Write the avagerage volume to file */
+  /* DEBUG Write the average volume to file */
   std::stringstream deformation_name;
   deformation_name << "neg_warp_avg_" << iter << ".nii.gz";
   writer->SetFileName( deformation_name.str() );
@@ -707,10 +727,7 @@ void NormalizeWarps( std::vector<std::string> filenames, int iter )
 
   for (unsigned int i=0; i < filenames.size(); i++)
   {
-    /* Read in the current image's warp */
-    std::stringstream deformation_name;
-    deformation_name << filenames[i] << "_" << iter << "_deformation.nii.gz";
-    defFieldReader->SetFileName( deformation_name.str() );
+    defFieldReader->SetFileName( DeformationName(filenames[i], iter) );
     try
     {
       defFieldReader->Update();
@@ -724,10 +741,8 @@ void NormalizeWarps( std::vector<std::string> filenames, int iter )
 
     adder->SetInput1( avg_def );
     adder->SetInput2( defFieldReader->GetOutput() );
-    adder->Update();
 
-    /* Write the new warp to file */
-    writer->SetFileName( deformation_name.str() );
+    writer->SetFileName( DeformationName(filenames[i], iter) );
     writer->SetUseCompression( true );
     writer->SetInput( adder->GetOutput() );
     try
@@ -764,13 +779,6 @@ void WriteDeformationField(DeformationFieldType::Pointer image, std::string file
   }
 }
 
-
-std::string DeformationName(std::string filename, int i)
-{
-  std::stringstream result;
-  result << filename << "_" << i << "_" "deformation.nii.gz";
-  return result.str();
-}
 
 
 void SetFilterSmoothing(ActualRegistrationFilterType::Pointer& filter, float sigmaDiff, float sigmaUp)
