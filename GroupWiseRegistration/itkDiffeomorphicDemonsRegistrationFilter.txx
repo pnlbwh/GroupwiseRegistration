@@ -92,24 +92,24 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
   f->SetInvDeformationField( this->GetInvDeformationField() );
 
   /*Debug*/
-  try
-  {
-    typedef itk::ImageFileWriter< DeformationFieldType>  FieldWriterType;
-    typename FieldWriterType::Pointer      fieldwriter =  FieldWriterType::New();
-    fieldwriter->SetUseCompression( true );
-    fieldwriter->SetFileName( "invdeformation.nii.gz" );
-    fieldwriter->SetInput( this->GetInvDeformationField()  );
-    fieldwriter->Update();
-    fieldwriter->SetFileName( "deformation.nii.gz" );
-    fieldwriter->SetInput( this->GetDeformationField()  );
-    fieldwriter->Update();
-  }
-  catch( itk::ExceptionObject& err )
-  {
-    std::cout << "Unexpected error." << std::endl;
-    std::cout << err << std::endl;
-    exit( EXIT_FAILURE );
-  }
+  //try
+  //{
+    //typedef itk::ImageFileWriter< DeformationFieldType>  FieldWriterType;
+    //typename FieldWriterType::Pointer      fieldwriter =  FieldWriterType::New();
+    //fieldwriter->SetUseCompression( true );
+    //fieldwriter->SetFileName( "invdeformation.nii.gz" );
+    //fieldwriter->SetInput( this->GetInvDeformationField()  );
+    //fieldwriter->Update();
+    //fieldwriter->SetFileName( "deformation.nii.gz" );
+    //fieldwriter->SetInput( this->GetDeformationField()  );
+    //fieldwriter->Update();
+  //}
+  //catch( itk::ExceptionObject& err )
+  //{
+    //std::cout << "Unexpected error." << std::endl;
+    //std::cout << err << std::endl;
+    //exit( EXIT_FAILURE );
+  //}
   /*End Debug*/
 
 

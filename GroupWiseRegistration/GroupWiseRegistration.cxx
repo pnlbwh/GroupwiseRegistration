@@ -53,6 +53,8 @@
 #include <itkNeighborhoodAlgorithm.h>
 #include "itkSmoothingRecursiveGaussianImageFilter.h"
 
+#include <libgen.h>
+
 namespace 
 {
   const unsigned int Dimension = 3;
@@ -456,7 +458,16 @@ void SetSpacing(ImageType::Pointer& image)
 
   image->SetOrigin( origin );
   image->SetSpacing( spacing );
+  ImageType::DirectionType direction;
+  direction.SetIdentity();
+  image->SetDirection(direction);
+}
 
+void SetDirection(ImageType::Pointer& image)
+{
+  ImageType::DirectionType direction;
+  direction.SetIdentity();
+  image->SetDirection(direction);
 }
 
 void MakeZeroDeformation(DeformationFieldType::Pointer &zero_image, DeformationFieldType::Pointer image)
@@ -473,7 +484,17 @@ void MakeZeroDeformation(DeformationFieldType::Pointer &zero_image, DeformationF
   zero_image->Allocate();
   zero_image->FillBuffer( 0.0 );
 
-  //SetSpacing(zero_image);
+  DeformationFieldType::SpacingType spacing;                                                                                                                                                                                   
+  spacing.Fill( 1.0 );
+  DeformationFieldType::PointType origin;
+  origin.Fill( 0.0 );
+
+  zero_image->SetSpacing( spacing );
+  zero_image->SetOrigin( origin );
+  DeformationFieldType::DirectionType direction;
+  direction.SetIdentity();
+  zero_image->SetDirection(direction);
+
 }
 
 
@@ -516,10 +537,10 @@ void GetImage(std::string filename, ImageType::Pointer& image)
 }
 
 
-std::string TemplateName(int i)
+std::string TemplateName(std::string dir, int i)
 {
   std::stringstream result;
-  result << "template" << i << ".nii.gz";
+  result << dir << "/template" << i << ".nii.gz";
   return result.str();
 }
 
@@ -575,18 +596,18 @@ void ComputeMean( std::vector<std::string> filenames, std::string filename)
 }
 
 
-std::string DeformationName(std::string filename, int i)
+std::string DeformationName(std::string outputDir, std::string filename, int i)
 {
   std::stringstream result;
-  result << filename << "_" << i << "_" "deformation.nii.gz";
+  result << outputDir << "/" << itksys::SystemTools::GetFilenameWithoutExtension(filename) << "_" << i << "_deformation.nii.gz";
   return result.str();
 }
 
 
-std::string WarpedImageName(std::string imageName, int i)
+std::string WarpedImageName(std::string outputDir, std::string filename, int i)
 {
   std::stringstream result;
-  result << imageName << "_" << i << "_warped.nii.gz";
+  result << outputDir << "/" << itksys::SystemTools::GetFilenameWithoutExtension(filename) << "_" << i << "_warped.nii.gz";
   return result.str();
 }
 
@@ -596,10 +617,14 @@ void ConfigureWarper(WarperType::Pointer& warper, ImageType::Pointer image)
   warper->SetOutputSpacing( image->GetSpacing() );
   warper->SetOutputOrigin( image->GetOrigin() );
   warper->SetOutputDirection( image->GetDirection() );
+
+  std::cout << "warper output spacing " << warper->GetOutputSpacing() << std::endl;
+  std::cout << "warper output origin " << warper->GetOutputOrigin() << std::endl;
+  std::cout << "warper output direction " << warper->GetOutputDirection() << std::endl;
 }
 
 
-void ComputeTemplateFromWarps( std::vector<std::string> filenames, int iter )
+void ComputeTemplateFromWarps( std::string outputDir, std::vector<std::string> filenames, int iter )
 {
   typedef itk::DisplacementFieldJacobianDeterminantFilter <DeformationFieldType, float>    JacobianDeterminantFilterType;
   JacobianDeterminantFilterType::Pointer jacdetfilter = JacobianDeterminantFilterType::New();
@@ -613,21 +638,39 @@ void ComputeTemplateFromWarps( std::vector<std::string> filenames, int iter )
   ImageType::Pointer               image;
   ImageType::Pointer               imgSum =  ImageType::New();
   ImageType::Pointer               jacDetSum = ImageType::New();
+  DeformationFieldType::Pointer    field = 0;
+  ImageType::DirectionType original_direction;
 
   for (unsigned int i=0; i < filenames.size(); i++)
   {
-    std::string warped_image_name = WarpedImageName(filenames[i], iter-1);
     GetImage(filenames[i], image);
     if (i==0)
     {
+      original_direction = image->GetDirection();
       MakeZeroVolume(imgSum, image);
       MakeZeroVolume(jacDetSum, image);
+      SetDirection(imgSum);
+      SetDirection(jacDetSum);
     }
-    fieldReader->SetFileName( DeformationName(filenames[i], iter-1) );
+    SetDirection(image);
+
+    fieldReader->SetFileName( DeformationName(outputDir, filenames[i], iter-1) );
+    field = fieldReader->GetOutput();
+
+    //DeformationFieldType::SpacingType spacing;                                                                                                                                                                                   
+    //spacing.Fill( 1.0 );
+    //DeformationFieldType::PointType origin;
+    //origin.Fill( 0.0 );
+    //fieldReader->GetOutput()->SetSpacing( spacing );
+    //fieldReader->GetOutput()->SetOrigin( origin );
+    //DeformationFieldType::DirectionType direction;
+    //direction.SetIdentity();
+    //fieldReader->GetOutput()->SetDirection(direction);
+
     warper->SetDeformationField( fieldReader->GetOutput() );
     ConfigureWarper(warper, image);
     
-    writer->SetFileName( warped_image_name );
+    writer->SetFileName( WarpedImageName(outputDir, filenames[i], iter-1) );
     writer->SetInput( warper->GetOutput() );
     UpdateWriter(writer, "Could not write warped image to disk");
 
@@ -643,27 +686,32 @@ void ComputeTemplateFromWarps( std::vector<std::string> filenames, int iter )
     adder->Update();
     imgSum = adder->GetOutput();
   }
+  imgSum->SetDirection(original_direction);
+  jacDetSum->SetDirection(original_direction);
   DivideByImageType::Pointer divider = DivideByImageType::New();
   divider->SetInput1( imgSum );
   divider->SetInput2( jacDetSum );
-  writer->SetFileName( TemplateName(iter) );
+  writer->SetFileName( TemplateName(outputDir, iter) );
+  //divider->GetOutput()->SetDirection(original_direction);
   writer->SetInput( divider->GetOutput() );
   UpdateWriter(writer, "Could not save the template.");
+  //std::cout << "original direction: " << original_direction << std::endl;
+  //std::cout << "divider direction: " << divider->GetOutput()->GetDirection() << std::endl;
 }
 
 
-void ComputeTemplate( std::vector<std::string> filenames, int iter )
+void ComputeTemplate( std::string outputDir, std::vector<std::string> filenames, int iter )
 {
   if (iter == 0)
   {
-    ComputeMean( filenames, TemplateName(0) );
+    ComputeMean( filenames, TemplateName(outputDir, 0) );
     return;
   }
-  ComputeTemplateFromWarps( filenames, iter);
+  ComputeTemplateFromWarps( outputDir, filenames, iter );
 }
 
 
-void NormalizeWarps( std::vector<std::string> filenames, int iter )
+void NormalizeWarps(std::string outputDir, std::vector<std::string> filenames, int iter )
 {
   DeformationWriterType::Pointer    writer =  DeformationWriterType::New();
   DeformationReaderType::Pointer    defFieldReader = DeformationReaderType::New();
@@ -673,7 +721,7 @@ void NormalizeWarps( std::vector<std::string> filenames, int iter )
 
   for (unsigned int i=0; i < filenames.size(); i++)
   {
-    defFieldReader->SetFileName(DeformationName(filenames[i], iter));
+    defFieldReader->SetFileName(DeformationName(outputDir, filenames[i], iter));
     try
     {
       defFieldReader->Update();
@@ -706,28 +754,9 @@ void NormalizeWarps( std::vector<std::string> filenames, int iter )
   multiplier->Update();
   avg_def = multiplier->GetOutput();
 
-
-  /* DEBUG Write the average volume to file */
-  std::stringstream deformation_name;
-  deformation_name << "neg_warp_avg_" << iter << ".nii.gz";
-  writer->SetFileName( deformation_name.str() );
-  writer->SetUseCompression( true );
-  writer->SetInput( adder->GetOutput() );
-  try
-  {
-    writer->Update();
-  }
-  catch( itk::ExceptionObject& err )
-  {
-    std::cout << "Unexpected error." << std::endl;
-    std::cout << err << std::endl;
-    exit( EXIT_FAILURE );
-  }
-
-
   for (unsigned int i=0; i < filenames.size(); i++)
   {
-    defFieldReader->SetFileName( DeformationName(filenames[i], iter) );
+    defFieldReader->SetFileName( DeformationName(outputDir, filenames[i], iter) );
     try
     {
       defFieldReader->Update();
@@ -742,7 +771,7 @@ void NormalizeWarps( std::vector<std::string> filenames, int iter )
     adder->SetInput1( avg_def );
     adder->SetInput2( defFieldReader->GetOutput() );
 
-    writer->SetFileName( DeformationName(filenames[i], iter) );
+    writer->SetFileName( DeformationName(outputDir, filenames[i], iter) );
     writer->SetUseCompression( true );
     writer->SetInput( adder->GetOutput() );
     try
@@ -836,6 +865,13 @@ std::vector<float> Range(float initial, float final, int num)
   return result;
 }
 
+void
+PrintImageInfo(std::string name, ImageType::Pointer& image)
+{
+    std::cout << name << " spacing: " << image->GetSpacing() << std::endl;
+    std::cout << name << " origin: " << image->GetOrigin() << std::endl;
+    std::cout << name << " direction: " << std::endl << image->GetDirection() << std::endl;
+}
 
 void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], std::string resultsDirectory, std::string outputVolume, bool useJacFlag )
 {
@@ -844,13 +880,15 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
   ActualRegistrationFilterType::Pointer  filter;
   std::stringstream deformation_name;
   ImageType::Pointer template_vol = 0; 
+  ImageType::Pointer image; 
   DeformationFieldType::Pointer field = 0;
   std::vector<float> sigma_diff = Range(args.initialSigmaDiff, args.finalSigmaDiff, args.numOuterIterations);
 
   //{//for mem allocations
 
+  std::cout << "Results Directory :" << args. resultsDirectory << std::endl;
 
-  ComputeTemplate(args.volumeFileNames, 0);
+  ComputeTemplate(args.resultsDirectory, args.volumeFileNames, 0);
 
   for (unsigned int j = 0; j < args.numOuterIterations; ++j)
   {
@@ -858,7 +896,9 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
     std::cout << " Starting Outer Iteration  " << j << std::endl;
     std::cout << "=========================================================================================" << std::endl;
 
-    GetImage(TemplateName(j), template_vol);
+    GetImage(TemplateName(args.resultsDirectory, j), template_vol);
+    PrintImageInfo("Template", template_vol);
+    SetDirection(template_vol);
 
     for (unsigned int i = 0; i < args.volumeFileNames.size(); ++i)
     {
@@ -866,8 +906,11 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
       std::cout << " Registering " << args.volumeFileNames[i] << " to template" << j << std::endl;
       std::cout << "=========================================================================================" << std::endl;
 
-      imageReader->SetFileName( args.volumeFileNames[i] );
-      
+
+      GetImage(args.volumeFileNames[i], image);
+      PrintImageInfo("Image", image);
+      SetDirection(image);
+
       filter = ActualRegistrationFilterType::New();
       ConfigureFilter(filter, sigma_diff[j], args.sigmaUp);
       std::cout << "sigma_diff[" << j << "] = " << sigma_diff[j] << std::endl;
@@ -876,7 +919,8 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
       multires->SetRegistrationFilter( filter );
       ConfigureMultiResFilter(multires, args);
       multires->SetFixedImage( template_vol );
-      multires->SetMovingImage( imageReader->GetOutput() );
+      //multires->SetMovingImage( imageReader->GetOutput() );
+      multires->SetMovingImage( image );
 
       if ( args.verbosity > 0 )
       {      
@@ -897,17 +941,21 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
         exit( EXIT_FAILURE );
       }
 
-      WriteDeformationField( multires->GetOutput(), DeformationName(args.volumeFileNames[i], j) );
+      std::cout << "Warp spacing: " << multires->GetOutput()->GetSpacing() << std::endl;
+      std::cout << "Warp origin: " << multires->GetOutput()->GetOrigin() << std::endl;
+      std::cout << "Warp direction: " << std::endl << multires->GetOutput()->GetDirection() << std::endl;
+
+      WriteDeformationField( multires->GetOutput(), DeformationName(args.resultsDirectory, args.volumeFileNames[i], j) );
 
       /*DEBUG*/
-      std::stringstream deformation_name;
-      deformation_name << args.volumeFileNames[i] << "_" << j << "_" "deformation-orig.nii.gz";
-      WriteDeformationField(multires->GetOutput(), deformation_name.str());
+      //std::stringstream deformation_name;
+      //deformation_name << args.volumeFileNames[i] << "_" << j << "_" "deformation-orig.nii.gz";
+      //WriteDeformationField(multires->GetOutput(), deformation_name.str());
       /*DEBUG*/
     } 
 
-    NormalizeWarps(args.volumeFileNames, j);
-    ComputeTemplate(args.volumeFileNames, j+1);
+    NormalizeWarps(args.resultsDirectory, args.volumeFileNames, j);
+    ComputeTemplate(args.resultsDirectory, args.volumeFileNames, j+1);
   }
   
 
