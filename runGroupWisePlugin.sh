@@ -17,6 +17,7 @@
 
 source ./slicer3-6/Slicer3-build/bin/Slicer3SetupPaths.csh
 #gdb --args ./slicer3-6/Slicer3-build/lib/Slicer3/Plugins/GroupWiseRegistration "--volumeFileNames ./input128/0652_128.nii.gz,./input128/g119_128.nii.gz --resultsDirectory ./output128 --output_image output.nii.gz --num_multires_levels 5 --num_outer_iterations 5 --num_inner_iterations 5 --initial_sigma_diff 10 --final_sigma_diff 2 --reg_weight 10 --useJacFlag"
-./slicer3-6/Slicer3-build/lib/Slicer3/Plugins/GroupWiseRegistration --volumeFileNames ./input128/0652_128.nii.gz,./input128/g119_128.nii.gz --resultsDirectory ./output128 --output_image output.nii.gz --num_multires_levels 5 --num_outer_iterations 5 --num_inner_iterations 5 --initial_sigma_diff 10 --final_sigma_diff 2 --reg_weight 10 --useJacFlag
+./slicer3-6/Slicer3-build/lib/Slicer3/Plugins/GroupWiseRegistration --volumeFileNames ./input128_6/G119_128.nrrd,./input128_6/G132_128.nrrd,./input128_6/G133_128.nrrd,./input128_6/G136_128.nrrd,./input128_6/G137_128.nrrd,./input128_6/G139_128.nrrd --resultsDirectory ./output128_6 --output_image output.nii.gz --num_multires_levels 5 --num_outer_iterations 5 --num_inner_iterations 5 --initial_sigma_diff 10 --final_sigma_diff 2 --reg_weight 1.0 --useJacFlag
+
 
 
