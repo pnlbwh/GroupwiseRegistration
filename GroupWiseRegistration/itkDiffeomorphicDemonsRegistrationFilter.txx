@@ -17,10 +17,8 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
 {
   typename DemonsRegistrationFunctionType::Pointer drfp;
   drfp = DemonsRegistrationFunctionType::New();
-  // drfp->SetRegWeight(this->GetRegWeight());
   // drfp->SetRegWeight(0.1); //inverse error
   drfp->SetRegWeight(1.0);
-  // std::cout << "Reg Weight is " << this->GetRegWeight() << std::endl;
 
   this->SetDifferenceFunction( static_cast<FiniteDifferenceFunctionType *>( drfp.GetPointer() ) );
 
@@ -37,8 +35,26 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
   m_Adder = AdderType::New();
   m_Adder->InPlaceOn();
 
-  /* Set the inverse deformation field to null */
   this->SetInvDeformationField(NULL);
+}
+
+
+template <class TFixedImage, class TMovingImage, class TDeformationField>
+void
+DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField>
+::SetRegWeight(double regWeight)
+{
+  DemonsRegistrationFunctionType *f = 
+    dynamic_cast<DemonsRegistrationFunctionType *>
+    (this->GetDifferenceFunction().GetPointer());
+
+  if ( !f )
+  {
+    itkExceptionMacro(<<"FiniteDifferenceFunction not of type DemonsRegistrationFunctionType");
+  }
+
+  f->SetRegWeight(regWeight);
+  std::cout << "Reg Weight is: " << f->GetRegWeight() << std::endl;
 }
 
 

@@ -145,7 +145,7 @@
       <label>Inversely proportional to gradient descent step size</label>
       <default>10.0</default>
       <constraints>
-        <minimum>5.0</minimum>
+        <minimum>1.0</minimum>
         <maximum>20.0</maximum>
         <step>1.0</step>
       </constraints>

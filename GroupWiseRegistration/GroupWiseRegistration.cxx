@@ -834,10 +834,11 @@ void SetFilterSmoothing(ActualRegistrationFilterType::Pointer& filter, float sig
 }
 
 
-void ConfigureFilter(ActualRegistrationFilterType::Pointer& filter, float sigmaDiff, float sigmaUp)
+void ConfigureRegistrationFilter(ActualRegistrationFilterType::Pointer& filter, float sigmaDiff, float sigmaUp, float regWeight)
 {
   filter->SetMaximumUpdateStepLength( 2.0 );
   filter->SetUseGradientType( DemonsRegistrationFunctionType::Symmetric ); //Symmetric is used in ESMInvConDemonsRegistrationFunction 
+  filter->SetRegWeight(regWeight);
   SetFilterSmoothing(filter, sigmaDiff, sigmaUp);    
 }
 
@@ -912,7 +913,7 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
       SetDirection(image);
 
       filter = ActualRegistrationFilterType::New();
-      ConfigureFilter(filter, sigma_diff[j], args.sigmaUp);
+      ConfigureRegistrationFilter(filter, sigma_diff[j], args.sigmaUp, args.regWeight);
       std::cout << "sigma_diff[" << j << "] = " << sigma_diff[j] << std::endl;
 
       MultiResRegistrationFilterType::Pointer multires = MultiResRegistrationFilterType::New();
