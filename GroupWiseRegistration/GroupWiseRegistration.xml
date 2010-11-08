@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <executable>
   <category></category>
-  <title>Log Domain Symmetric Registration</title>
+  <title>Groupwise Log Domain Symmetric Registration</title>
   <description>
 </description>
   <version>0.1.0.$Revision: 8595 $(alpha)</version>
@@ -54,14 +54,14 @@
       <description>Suffix for output volumes file name</description>
     </string>
 
-    <image>
-      <name>outputVolume</name>
-      <label>Output Atlas Volume</label>
-      <flag>o</flag>
-      <longflag>output_image</longflag>
-      <channel>output</channel>
-      <description></description>
-    </image>
+    <!--<image>-->
+      <!--<name>outputVolume</name>-->
+      <!--<label>Output Atlas Volume</label>-->
+      <!--<flag>o</flag>-->
+      <!--<longflag>output_image</longflag>-->
+      <!--<channel>output</channel>-->
+      <!--<description></description>-->
+    <!--</image>-->
 
   </parameters>
 
@@ -119,7 +119,7 @@
       <label>Initial smoothness the warp</label>
       <default>10.0</default>
       <constraints>
-        <minimum>5.0</minimum>
+        <minimum>1.0</minimum>
         <maximum>20.0</maximum>
         <step>1.0</step>
       </constraints>
@@ -150,14 +150,6 @@
         <step>1.0</step>
       </constraints>
     </double>
-    <boolean>
-      <name>useJacFlag</name>
-      <longflag>useJacFlag</longflag>
-      <description>Use Jacobian</description>
-      <label>Use Jacobian (default true)</label>
-      <default>true</default>
-    </boolean>
-
 </parameters>
 
 </executable>

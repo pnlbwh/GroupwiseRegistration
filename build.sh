@@ -10,7 +10,9 @@ if [ ! -e $dir ]; then
   slicer3-6/Slicer3/Scripts/getbuildtest.tcl -t "" --no-slicer-update
 else
   echo copying to $dir
-  cp GroupWiseRegistration/*  $dir
+  cp -R GroupWiseRegistration  $dir
+  cp -R WarpVolume $dir
+  cp CMakeLists.txt $dir
 fi
 
 make -f slicer3-6/Slicer3-build/Applications/CLI/GroupWiseRegistration/Makefile

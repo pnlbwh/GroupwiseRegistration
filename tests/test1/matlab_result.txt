@@ -1,0 +1,501 @@
+Elapsed time: 0.058747 seconds
+numbr of inner iterations is 
+     1
+
+    3.8632
+
+     2
+
+    3.4884
+
+     3
+
+    3.4620
+
+     4
+
+    3.4617
+
+     5
+
+    3.4627
+
+Elapsed time: 0.1085 seconds
+numbr of inner iterations is 
+     1
+
+    6.9353
+
+     2
+
+    5.9801
+
+     3
+
+    5.8305
+
+     4
+
+    5.7777
+
+     5
+
+    5.7550
+
+Elapsed time: 0.52383 seconds
+numbr of inner iterations is 
+     1
+
+   11.1547
+
+     2
+
+    9.5011
+
+     3
+
+    9.2952
+
+     4
+
+    9.2283
+
+     5
+
+    9.1976
+
+Elapsed time: 4.9091 seconds
+numbr of inner iterations is 
+     1
+
+   13.2537
+
+     2
+
+   10.7970
+
+     3
+
+   10.4730
+
+     4
+
+   10.3616
+
+     5
+
+   10.3137
+
+Elapsed time: 36.6972 seconds
+Rescaling NIFTI: slope = 1, intercept = 0
+numbr of inner iterations is 
+     1
+
+    3.3119
+
+     2
+
+    3.5978
+
+     3
+
+    3.5474
+
+     4
+
+    3.4726
+
+     5
+
+    3.4372
+
+Elapsed time: 0.060823 seconds
+numbr of inner iterations is 
+     1
+
+    6.0548
+
+     2
+
+    5.9238
+
+     3
+
+    5.9208
+
+     4
+
+    5.9170
+
+     5
+
+    5.9173
+
+Elapsed time: 0.1059 seconds
+numbr of inner iterations is 
+     1
+
+   11.3319
+
+     2
+
+   10.0906
+
+     3
+
+    9.8730
+
+     4
+
+    9.7892
+
+     5
+
+    9.7495
+
+Elapsed time: 0.53356 seconds
+numbr of inner iterations is 
+     1
+
+   16.0496
+
+     2
+
+   13.4850
+
+     3
+
+   13.1340
+
+     4
+
+   12.9967
+
+     5
+
+   12.9349
+
+Elapsed time: 5.1668 seconds
+numbr of inner iterations is 
+     1
+
+   17.9037
+
+     2
+
+   14.1567
+
+     3
+
+   13.5467
+
+     4
+
+   13.3168
+
+     5
+
+   13.2067
+
+Elapsed time: 36.5412 seconds
+Rescaling NIFTI: slope = 1, intercept = 0
+numbr of inner iterations is 
+     1
+
+    1.8121
+
+     2
+
+    2.0647
+
+     3
+
+    2.2011
+
+     4
+
+    2.3126
+
+     5
+
+    2.4306
+
+Elapsed time: 0.062158 seconds
+numbr of inner iterations is 
+     1
+
+    3.9113
+
+     2
+
+    3.4877
+
+     3
+
+    3.4018
+
+     4
+
+    3.3603
+
+     5
+
+    3.3370
+
+Elapsed time: 0.10648 seconds
+numbr of inner iterations is 
+     1
+
+    7.1023
+
+     2
+
+    6.3915
+
+     3
+
+    6.2974
+
+     4
+
+    6.2665
+
+     5
+
+    6.2496
+
+Elapsed time: 0.49825 seconds
+numbr of inner iterations is 
+     1
+
+   12.1836
+
+     2
+
+   10.5554
+
+     3
+
+   10.3267
+
+     4
+
+   10.2519
+
+     5
+
+   10.2188
+
+Elapsed time: 5.2061 seconds
+numbr of inner iterations is 
+     1
+
+   14.9130
+
+     2
+
+   12.0299
+
+     3
+
+   11.5981
+
+     4
+
+   11.4399
+
+     5
+
+   11.3584
+
+Elapsed time: 35.9915 seconds
+Rescaling NIFTI: slope = 1, intercept = 0
+numbr of inner iterations is 
+     1
+
+    2.0303
+
+     2
+
+    3.1788
+
+     3
+
+    2.8113
+
+     4
+
+    2.4551
+
+     5
+
+    2.4171
+
+Elapsed time: 0.062608 seconds
+numbr of inner iterations is 
+     1
+
+    4.5233
+
+     2
+
+    4.2041
+
+     3
+
+    4.1696
+
+     4
+
+    4.1849
+
+     5
+
+    4.2069
+
+Elapsed time: 0.1078 seconds
+numbr of inner iterations is 
+     1
+
+    8.3823
+
+     2
+
+    7.1197
+
+     3
+
+    6.9632
+
+     4
+
+    6.9093
+
+     5
+
+    6.8856
+
+Elapsed time: 0.53464 seconds
+numbr of inner iterations is 
+     1
+
+   12.9756
+
+     2
+
+   10.7560
+
+     3
+
+   10.4656
+
+     4
+
+   10.3753
+
+     5
+
+   10.3346
+
+Elapsed time: 4.9948 seconds
+numbr of inner iterations is 
+     1
+
+   14.7388
+
+     2
+
+   11.7327
+
+     3
+
+   11.2934
+
+     4
+
+   11.1453
+
+     5
+
+   11.0802
+
+Elapsed time: 37.644 seconds
+Rescaling NIFTI: slope = 1, intercept = 0
+Rescaling NIFTI: slope = 1, intercept = 0
+Rescaling NIFTI: slope = 1, intercept = 0
+Rescaling NIFTI: slope = 1, intercept = 0
+Rescaling NIFTI: slope = 1, intercept = 0
+Rescaling NIFTI: slope = 1, intercept = 0
+
+i =
+
+     1
+
+Rescaling NIFTI: slope = 1, intercept = 0
+
+i =
+
+     2
+
+Rescaling NIFTI: slope = 1, intercept = 0
+
+i =
+
+     3
+
+Rescaling NIFTI: slope = 1, intercept = 0
+
+i =
+
+     4
+
+Rescaling NIFTI: slope = 1, intercept = 0
+
+i =
+
+     5
+
+Rescaling NIFTI: slope = 1, intercept = 0
+
+i =
+
+     6
+
+Rescaling NIFTI: slope = 1, intercept = 0
+
+i =
+
+     1
+
+Rescaling NIFTI: slope = 1, intercept = 0
+
+i =
+
+     2
+
+Rescaling NIFTI: slope = 1, intercept = 0
+
+i =
+
+     3
+
+Rescaling NIFTI: slope = 1, intercept = 0
+
+i =
+
+     4
+
+Rescaling NIFTI: slope = 1, intercept = 0
+
+i =
+
+     5
+
+Rescaling NIFTI: slope = 1, intercept = 0
+
+i =
+
+     6
+
+Rescaling NIFTI: slope = 1, intercept = 0
+

@@ -84,7 +84,6 @@ namespace
 
 struct arguments
 {
-   std::string outputImageFile;
    unsigned int numLevels;
    unsigned int numIterations;
    std::vector<std::string> volumeFileNames;   
@@ -98,14 +97,7 @@ struct arguments
    float sigmaUp;          
    float maxStepLength;     
    unsigned int verbosity;
-   // unsigned int gradientType;
 
-   // std::string  fixedImageFile;  /* -f option */
-   // std::string  movingImageFile; /* -m option */
-   // std::string  outputFieldFile; /* -O option */
-   // std::string  trueFieldFile;   /* -r option */
-   // std::vector<unsigned int> numIterations;   /* -i option */
-   // bool useVanillaDem;           /* -a option */
    // bool useHistogramMatching;    /* -e option */
 
    arguments () :
@@ -117,7 +109,6 @@ struct arguments
      finalSigmaDiff(2),
      regWeight(1e1),
      useJac(true),
-     outputImageFile("output.nii.gz"),
      sigmaDef(3.0f),
      sigmaUp(0.0f),
      maxStepLength(2.0f),
@@ -874,7 +865,7 @@ PrintImageInfo(std::string name, ImageType::Pointer& image)
     std::cout << name << " direction: " << std::endl << image->GetDirection() << std::endl;
 }
 
-void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], std::string resultsDirectory, std::string outputVolume, bool useJacFlag )
+void DoGroupWiseRegistration( arguments args )
 {
   WriterType::Pointer                    writer =  WriterType::New();
   ImageReaderType::Pointer               imageReader = ImageReaderType::New();
@@ -887,7 +878,7 @@ void DoGroupWiseRegistration( arguments args, std::string p_arrVolumeNames[], st
 
   //{//for mem allocations
 
-  std::cout << "Results Directory :" << args. resultsDirectory << std::endl;
+  std::cout << "Results Directory :" << args.resultsDirectory << std::endl;
 
   ComputeTemplate(args.resultsDirectory, args.volumeFileNames, 0);
 
@@ -995,12 +986,7 @@ int main( int argc, char * argv[] )
     volumeNames[i] = volumeFileNames[i].c_str();
     }
 
- // set up the args structure from the parsed input
    arguments args;
-   // args.fixedImageFile = demonsTargetVolume;
-   // args.movingImageFile = demonsMovingVolume;
-   // args.outputImageFile = demonsResampledVolume;
-   // args.outputFieldFile = demonsDeformationVolume;
    // if (iteration.size() > 0)
    //   {
    //   args.numIterations.clear();
@@ -1016,7 +1002,6 @@ int main( int argc, char * argv[] )
    // args.gradientType = gradientType;
    // args.useHistogramMatching = normalization;
    // args.verbosity = verbose;
-   args.outputImageFile = outputVolume;
    args.numLevels = numMultiresLevels;
    args.numIterations = numInnerIterations;
    args.volumeFileNames = volumeFileNames;
@@ -1025,9 +1010,8 @@ int main( int argc, char * argv[] )
    args.initialSigmaDiff = initialSigmaDiff;
    args.finalSigmaDiff = finalSigmaDiff;
    args.regWeight = regWeight;
-   args.useJac = useJacFlag;
 
-  DoGroupWiseRegistration(args, volumeNames, resultsDirectory.c_str(), outputVolume.c_str(), useJacFlag);
+  DoGroupWiseRegistration(args);
   //GroupWiseRegistration<3> gpreg;
 
   return EXIT_SUCCESS;
