@@ -16,8 +16,8 @@
     <description>Input/output parameters</description>
     
     <file multiple="false" fileExtensions="nii.gz">
-      <name>input</name>
-      <longflag>input</longflag>
+      <name>inputVolume</name>
+      <longflag>inputVolume</longflag>
       <description>Input volume</description>
       <label>Volume to warp</label>      
       <channel>input</channel>
