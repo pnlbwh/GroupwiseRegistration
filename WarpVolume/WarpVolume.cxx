@@ -46,7 +46,7 @@ int SeparateImages( const typename itk::VectorImage< PixelType , 3 >
                                                             imagePile->GetLargestPossibleRegion() );
    typedef typename itk::ImageRegionIterator< ImageType > IteratorImageType;
    std::vector< IteratorImageType > out;
-   for( unsigned int i = 0; i < imagePile->GetVectorLength() ; i++ )
+   for( unsigned int i = 0; i < imagePile->GetVectorLength(); i++ )
    {
       typename ImageType::Pointer imageTemp = ImageType::New();
       imageTemp->SetRegions( size );
@@ -59,10 +59,10 @@ int SeparateImages( const typename itk::VectorImage< PixelType , 3 >
       outtemp.GoToBegin();
       out.push_back( outtemp );
    }
-   for( in.GoToBegin(); !in.IsAtEnd() ; ++in )
+   for( in.GoToBegin(); !in.IsAtEnd(); ++in )
    {
       itk::VariableLengthVector< PixelType > value = in.Get();
-      for( unsigned int i = 0; i < imagePile->GetVectorLength() ; i++ )
+      for( unsigned int i = 0; i < imagePile->GetVectorLength(); i++ )
       {
          out[ i ].Set( value[ i ] );
          ++out[ i ];
@@ -94,7 +94,7 @@ int AddImage( typename itk::VectorImage< PixelType, 3 >
                                                                              );
    typedef typename itk::ImageRegionIterator< ImageType > IteratorImageType;
    std::vector< IteratorImageType > in;
-   for( unsigned int i = 0; i < imagePile->GetVectorLength() ; i++ )
+   for( unsigned int i = 0; i < imagePile->GetVectorLength(); i++ )
    {
       IteratorImageType intemp( vectorImage.at( i ) , vectorImage.at( i )->GetLargestPossibleRegion() );
       intemp.GoToBegin();
@@ -102,9 +102,9 @@ int AddImage( typename itk::VectorImage< PixelType, 3 >
    }
    itk::VariableLengthVector< PixelType > value;
    value.SetSize( vectorImage.size() );
-   for( out.GoToBegin(); !out.IsAtEnd() ; ++out )
+   for( out.GoToBegin(); !out.IsAtEnd(); ++out )
    {
-      for( unsigned int i = 0; i < imagePile->GetVectorLength() ; i++ )
+      for( unsigned int i = 0; i < imagePile->GetVectorLength(); i++ )
       {
          value.SetElement( i , in.at( i ).Get() );
          ++in[ i ];
@@ -142,30 +142,58 @@ int Warp( parameters &list )
 {
   const unsigned int Dimension = 3;
   typedef itk::Vector<float, Dimension>  VectorPixelType;
-  typedef itk::Image< PixelType, Dimension >  ImageType;
+  //typedef itk::Image< PixelType, Dimension >  ImageType;
+  typedef itk::OrientedImage< PixelType , Dimension > ImageType;
   typedef itk::Image<VectorPixelType, Dimension>  DeformationFieldType;
   typedef itk::WarpImageFilter <ImageType, ImageType, DeformationFieldType>  WarperType;
   typedef itk::ImageFileReader< DeformationFieldType >    DeformationReaderType;
-  typedef itk::ImageFileReader< ImageType >   ImageReaderType;
+  typedef itk::VectorImage< PixelType , Dimension > VectorImageType;
+  typedef itk::ImageFileReader< VectorImageType >   ImageReaderType;
+  //typedef itk::ImageFileWriter< VectorImageType >   WriterType;
   typedef itk::ImageFileWriter< ImageType >   WriterType;
+
+  itk::MetaDataDictionary dico;
 
   DeformationReaderType::Pointer   fieldReader = DeformationReaderType::New();
   fieldReader->SetFileName( list.warp.c_str() );
+  fieldReader->Update();
 
+  /* read input volume */
   typename ImageReaderType::Pointer imageReader = ImageReaderType::New();
   imageReader->SetFileName( list.inputVolume.c_str() );
   imageReader->Update();
 
+  /* separate into a vector */
+  std::vector< typename ImageType::Pointer > vectorOfImage;
+  SeparateImages< PixelType >( imageReader->GetOutput() , vectorOfImage ) ;
+
+  /* warp the image(s) */
   typename WarperType::Pointer   warper = WarperType::New();
   warper->SetDeformationField( fieldReader->GetOutput() );
-  warper->SetInput( imageReader->GetOutput() );
-  warper->SetOutputSpacing( imageReader->GetOutput()->GetSpacing() );
-  warper->SetOutputOrigin( imageReader->GetOutput()->GetOrigin() );
-  warper->SetOutputDirection( imageReader->GetOutput()->GetDirection() );
+
+  std::vector< typename ImageType::Pointer > vectorOutputImage ;
+
+  std::cout << "size of vector: " << vectorOfImage.size() << std::endl;
+  for( ::size_t i = 0; i < vectorOfImage.size(); i++ )
+  {
+    std::cout << "in loop, size: " << vectorOfImage.size() << ", iteration: " << i <<  std::endl;
+    warper->SetInput( vectorOfImage[i] );
+    warper->SetOutputSpacing( vectorOfImage[i]->GetSpacing() );
+    warper->SetOutputOrigin( vectorOfImage[i]->GetOrigin() );
+    warper->SetOutputDirection( vectorOfImage[i]->GetDirection() );
+    warper->Update();
+    vectorOutputImage.push_back( warper->GetOutput() );
+    vectorOutputImage[i]->DisconnectPipeline();
+  }
+
+  //warper->SetInput( imageReader->GetOutput() );
+  //warper->SetOutputSpacing( imageReader->GetOutput()->GetSpacing() );
+  //warper->SetOutputOrigin( imageReader->GetOutput()->GetOrigin() );
+  //warper->SetOutputDirection( imageReader->GetOutput()->GetDirection() );
 
   typename WriterType::Pointer  writer =  WriterType::New();
   writer->SetFileName( WarpedImageName(list.resultsDirectory, list.inputVolume) );
-  writer->SetInput( warper->GetOutput() );
+  writer->SetInput( vectorOutputImage[0] );
   //writer->SetInput( imageReader->GetOutput() );
   writer->SetUseCompression( true );
   try
@@ -178,6 +206,22 @@ int Warp( parameters &list )
     std::cout << err << std::endl;
     exit( EXIT_FAILURE );
   }
+
+  /* debug */
+  writer->SetInput( vectorOfImage[0] );
+  writer->SetFileName( "./component5.nrrd" );
+  writer->SetUseCompression( true );
+  try
+  {
+    writer->Update();
+  }
+  catch( itk::ExceptionObject& err )
+  {
+    std::cout << "Could not write 5th component" << std::endl;
+    std::cout << err << std::endl;
+    exit( EXIT_FAILURE );
+  }
+
 }
 
 
