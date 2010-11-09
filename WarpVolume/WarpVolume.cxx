@@ -14,10 +14,10 @@
 
 struct parameters
 {
-  std::string inputVolume ;
-  std::string warp ;
-  std::string resultsDirectory ;
-} ;
+  std::string inputVolume;
+  std::string warp;
+  std::string resultsDirectory;
+};
 
 
 
@@ -32,43 +32,43 @@ int SeparateImages( const typename itk::VectorImage< PixelType , 3 >
                     std::vector< typename itk::OrientedImage< PixelType , 3 >::Pointer > &vectorImage
                   )
 {
-   typedef itk::OrientedImage< PixelType , 3 > ImageType ;
-   typedef itk::VectorImage< PixelType , 3 > VectorImageType ;
-   typename itk::VectorImage< PixelType , 3 >::SizeType size ;
-   typename itk::VectorImage< PixelType , 3 >::DirectionType direction ;
-   typename itk::VectorImage< PixelType , 3 >::PointType origin ;
-   typename itk::VectorImage< PixelType , 3 >::SpacingType spacing ;
-   size = imagePile->GetLargestPossibleRegion().GetSize() ;
-   direction=imagePile->GetDirection() ;
-   origin=imagePile->GetOrigin() ;
-   spacing=imagePile->GetSpacing() ;
+   typedef itk::OrientedImage< PixelType , 3 > ImageType;
+   typedef itk::VectorImage< PixelType , 3 > VectorImageType;
+   typename itk::VectorImage< PixelType , 3 >::SizeType size;
+   typename itk::VectorImage< PixelType , 3 >::DirectionType direction;
+   typename itk::VectorImage< PixelType , 3 >::PointType origin;
+   typename itk::VectorImage< PixelType , 3 >::SpacingType spacing;
+   size = imagePile->GetLargestPossibleRegion().GetSize();
+   direction=imagePile->GetDirection();
+   origin=imagePile->GetOrigin();
+   spacing=imagePile->GetSpacing();
    typename itk::ImageRegionIterator< VectorImageType > in( imagePile ,
-                                                            imagePile->GetLargestPossibleRegion() ) ;
-   typedef typename itk::ImageRegionIterator< ImageType > IteratorImageType ;
-   std::vector< IteratorImageType > out ;
-   for( unsigned int i = 0 ; i < imagePile->GetVectorLength() ; i++ )
+                                                            imagePile->GetLargestPossibleRegion() );
+   typedef typename itk::ImageRegionIterator< ImageType > IteratorImageType;
+   std::vector< IteratorImageType > out;
+   for( unsigned int i = 0; i < imagePile->GetVectorLength() ; i++ )
    {
-      typename ImageType::Pointer imageTemp = ImageType::New() ;
-      imageTemp->SetRegions( size ) ;
-      imageTemp->SetOrigin( origin ) ;
-      imageTemp->SetDirection( direction ) ;
-      imageTemp->SetSpacing( spacing ) ;
-      imageTemp->Allocate() ;
-      vectorImage.push_back( imageTemp ) ;
-      IteratorImageType outtemp( imageTemp , imageTemp->GetLargestPossibleRegion() ) ;
-      outtemp.GoToBegin() ;
-      out.push_back( outtemp ) ;
+      typename ImageType::Pointer imageTemp = ImageType::New();
+      imageTemp->SetRegions( size );
+      imageTemp->SetOrigin( origin );
+      imageTemp->SetDirection( direction );
+      imageTemp->SetSpacing( spacing );
+      imageTemp->Allocate();
+      vectorImage.push_back( imageTemp );
+      IteratorImageType outtemp( imageTemp , imageTemp->GetLargestPossibleRegion() );
+      outtemp.GoToBegin();
+      out.push_back( outtemp );
    }
-   for( in.GoToBegin() ; !in.IsAtEnd() ; ++in )
+   for( in.GoToBegin(); !in.IsAtEnd() ; ++in )
    {
-      itk::VariableLengthVector< PixelType > value = in.Get() ;
-      for( unsigned int i = 0 ; i < imagePile->GetVectorLength() ; i++ )
+      itk::VariableLengthVector< PixelType > value = in.Get();
+      for( unsigned int i = 0; i < imagePile->GetVectorLength() ; i++ )
       {
-         out[ i ].Set( value[ i ] ) ;
-         ++out[ i ] ;
+         out[ i ].Set( value[ i ] );
+         ++out[ i ];
       }
    }
-   return EXIT_SUCCESS ;
+   return EXIT_SUCCESS;
 }
 
 /*
@@ -82,36 +82,36 @@ int AddImage( typename itk::VectorImage< PixelType, 3 >
               const std::vector< typename itk::OrientedImage< PixelType , 3 > ::Pointer > &vectorImage
             )
 {
-   typedef itk::OrientedImage< PixelType , 3 > ImageType ;
-   imagePile->SetRegions( vectorImage.at( 0 )->GetLargestPossibleRegion().GetSize() ) ;
-   imagePile->SetOrigin( vectorImage.at( 0 )->GetOrigin() ) ;
-   imagePile->SetDirection( vectorImage.at( 0 )->GetDirection() ) ;
-   imagePile->SetSpacing( vectorImage.at( 0 )->GetSpacing() ) ;
-   imagePile->SetVectorLength( vectorImage.size() ) ;
-   imagePile->Allocate() ;
+   typedef itk::OrientedImage< PixelType , 3 > ImageType;
+   imagePile->SetRegions( vectorImage.at( 0 )->GetLargestPossibleRegion().GetSize() );
+   imagePile->SetOrigin( vectorImage.at( 0 )->GetOrigin() );
+   imagePile->SetDirection( vectorImage.at( 0 )->GetDirection() );
+   imagePile->SetSpacing( vectorImage.at( 0 )->GetSpacing() );
+   imagePile->SetVectorLength( vectorImage.size() );
+   imagePile->Allocate();
    typename itk::ImageRegionIterator< itk::VectorImage< PixelType , 3 > > out( imagePile ,
                                                                                imagePile->GetLargestPossibleRegion()
-                                                                             ) ;
-   typedef typename itk::ImageRegionIterator< ImageType > IteratorImageType ;
-   std::vector< IteratorImageType > in ;
-   for( unsigned int i = 0 ; i < imagePile->GetVectorLength() ; i++ )
+                                                                             );
+   typedef typename itk::ImageRegionIterator< ImageType > IteratorImageType;
+   std::vector< IteratorImageType > in;
+   for( unsigned int i = 0; i < imagePile->GetVectorLength() ; i++ )
    {
-      IteratorImageType intemp( vectorImage.at( i ) , vectorImage.at( i )->GetLargestPossibleRegion() ) ;
+      IteratorImageType intemp( vectorImage.at( i ) , vectorImage.at( i )->GetLargestPossibleRegion() );
       intemp.GoToBegin();
-      in.push_back( intemp ) ;
+      in.push_back( intemp );
    }
-   itk::VariableLengthVector< PixelType > value ;
-   value.SetSize( vectorImage.size() ) ;
-   for( out.GoToBegin() ; !out.IsAtEnd() ; ++out )
+   itk::VariableLengthVector< PixelType > value;
+   value.SetSize( vectorImage.size() );
+   for( out.GoToBegin(); !out.IsAtEnd() ; ++out )
    {
-      for( unsigned int i = 0 ; i < imagePile->GetVectorLength() ; i++ )
+      for( unsigned int i = 0; i < imagePile->GetVectorLength() ; i++ )
       {
-         value.SetElement( i , in.at( i ).Get() ) ;
-         ++in[ i ] ;
+         value.SetElement( i , in.at( i ).Get() );
+         ++in[ i ];
       }
-    out.Set( value ) ;
+    out.Set( value );
     }
-  return EXIT_SUCCESS ;
+  return EXIT_SUCCESS;
 }
 
 std::string WarpedImageName(std::string outputDir, std::string filename)
@@ -126,13 +126,13 @@ void GetImageType( std::string fileName ,
                    itk::ImageIOBase::IOComponentType &componentType
                  )
 {
-   typedef itk::Image< unsigned char , 3 > ImageType ;
-   itk::ImageFileReader< ImageType >::Pointer imageReader ;
-   imageReader = itk::ImageFileReader< ImageType >::New() ;
-   imageReader->SetFileName( fileName.c_str() ) ;
-   imageReader->UpdateOutputInformation() ;
-   pixelType = imageReader->GetImageIO()->GetPixelType() ;
-   componentType = imageReader->GetImageIO()->GetComponentType() ;
+   typedef itk::Image< unsigned char , 3 > ImageType;
+   itk::ImageFileReader< ImageType >::Pointer imageReader;
+   imageReader = itk::ImageFileReader< ImageType >::New();
+   imageReader->SetFileName( fileName.c_str() );
+   imageReader->UpdateOutputInformation();
+   pixelType = imageReader->GetImageIO()->GetPixelType();
+   componentType = imageReader->GetImageIO()->GetComponentType();
 }
 
 
@@ -189,9 +189,9 @@ int main( int argc, char * argv[] )
   std::cout << "warp:" << warp << std::endl;
   std::cout << "input volume:" << inputVolume << std::endl;
 
-  itk::ImageIOBase::IOPixelType pixelType ;
-  itk::ImageIOBase::IOComponentType componentType ;
-  GetImageType( inputVolume , pixelType , componentType ) ;
+  itk::ImageIOBase::IOPixelType pixelType;
+  itk::ImageIOBase::IOComponentType componentType;
+  GetImageType( inputVolume , pixelType , componentType );
 
   parameters list;
   list.resultsDirectory = resultsDirectory;
@@ -201,39 +201,39 @@ int main( int argc, char * argv[] )
   switch( componentType )
    {
       case itk::ImageIOBase::UCHAR:
-         return Warp< unsigned char >( list ) ;
+         return Warp< unsigned char >( list );
          break;
       case itk::ImageIOBase::CHAR:
-         return Warp< char >( list ) ;
+         return Warp< char >( list );
          break;
       case itk::ImageIOBase::USHORT:
-         return Warp< unsigned short >( list ) ;
+         return Warp< unsigned short >( list );
          break;
       case itk::ImageIOBase::SHORT:
-         return Warp< short >( list ) ;
+         return Warp< short >( list );
          break;
       case itk::ImageIOBase::UINT:
-         return Warp< unsigned int >( list ) ;
+         return Warp< unsigned int >( list );
          break;
       case itk::ImageIOBase::INT:
-         return Warp< int >( list ) ;
+         return Warp< int >( list );
          break;
       case itk::ImageIOBase::ULONG:
-         return Warp< unsigned long >( list ) ;
+         return Warp< unsigned long >( list );
          break;
       case itk::ImageIOBase::LONG:
-         return Warp< long >( list ) ;
+         return Warp< long >( list );
          break;
       case itk::ImageIOBase::FLOAT:
-         return Warp< float >( list ) ;
+         return Warp< float >( list );
          break;
       case itk::ImageIOBase::DOUBLE:
-         return Warp< double >( list ) ;
+         return Warp< double >( list );
          break;
       case itk::ImageIOBase::UNKNOWNCOMPONENTTYPE:
       default:
          std::cerr << "Unknown component type" << std::endl;
          break;
    }
-   return EXIT_FAILURE ;
+   return EXIT_FAILURE;
 }
