@@ -181,6 +181,7 @@ int Warp( parameters &list )
     warper->SetOutputSpacing( vectorOfImage[i]->GetSpacing() );
     warper->SetOutputOrigin( vectorOfImage[i]->GetOrigin() );
     warper->SetOutputDirection( vectorOfImage[i]->GetDirection() );
+    warper->SetOutputSize( vectorOfImage[i]->GetLargestPossibleRegion().GetSize() );
     warper->Update();
     vectorOutputImage.push_back( warper->GetOutput() );
     vectorOutputImage[i]->DisconnectPipeline();
@@ -193,7 +194,7 @@ int Warp( parameters &list )
 
   typename WriterType::Pointer  writer =  WriterType::New();
   writer->SetFileName( WarpedImageName(list.resultsDirectory, list.inputVolume) );
-  writer->SetInput( vectorOutputImage[0] );
+  writer->SetInput( vectorOutputImage[7] );
   //writer->SetInput( imageReader->GetOutput() );
   writer->SetUseCompression( true );
   try
@@ -208,8 +209,8 @@ int Warp( parameters &list )
   }
 
   /* debug */
-  writer->SetInput( vectorOfImage[0] );
-  writer->SetFileName( "./component5.nrrd" );
+  writer->SetInput( vectorOfImage[7] );
+  writer->SetFileName( "./component7.nrrd" );
   writer->SetUseCompression( true );
   try
   {
