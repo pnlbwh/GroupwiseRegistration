@@ -138,7 +138,7 @@ void GetImageType( std::string fileName ,
 
 
 template< class PixelType > 
-int Warp( parameters &list )
+int Warp( parameters &args )
 {
   const unsigned int Dimension = 3;
   typedef itk::Vector<float, Dimension>  VectorPixelType;
@@ -149,18 +149,18 @@ int Warp( parameters &list )
   typedef itk::ImageFileReader< DeformationFieldType >    DeformationReaderType;
   typedef itk::VectorImage< PixelType , Dimension > VectorImageType;
   typedef itk::ImageFileReader< VectorImageType >   ImageReaderType;
-  //typedef itk::ImageFileWriter< VectorImageType >   WriterType;
-  typedef itk::ImageFileWriter< ImageType >   WriterType;
+  typedef itk::ImageFileWriter< VectorImageType >   WriterType;
+  //typedef itk::ImageFileWriter< ImageType >   WriterType;
 
   itk::MetaDataDictionary dico;
 
   DeformationReaderType::Pointer   fieldReader = DeformationReaderType::New();
-  fieldReader->SetFileName( list.warp.c_str() );
+  fieldReader->SetFileName( args.warp.c_str() );
   fieldReader->Update();
 
   /* read input volume */
   typename ImageReaderType::Pointer imageReader = ImageReaderType::New();
-  imageReader->SetFileName( list.inputVolume.c_str() );
+  imageReader->SetFileName( args.inputVolume.c_str() );
   imageReader->Update();
 
   /* separate into a vector */
@@ -173,10 +173,9 @@ int Warp( parameters &list )
 
   std::vector< typename ImageType::Pointer > vectorOutputImage ;
 
-  std::cout << "size of vector: " << vectorOfImage.size() << std::endl;
   for( ::size_t i = 0; i < vectorOfImage.size(); i++ )
   {
-    std::cout << "in loop, size: " << vectorOfImage.size() << ", iteration: " << i <<  std::endl;
+    std::cout << "number of components: " << vectorOfImage.size() << ", iteration: " << i <<  std::endl;
     warper->SetInput( vectorOfImage[i] );
     warper->SetOutputSpacing( vectorOfImage[i]->GetSpacing() );
     warper->SetOutputOrigin( vectorOfImage[i]->GetOrigin() );
@@ -187,14 +186,19 @@ int Warp( parameters &list )
     vectorOutputImage[i]->DisconnectPipeline();
   }
 
+  typename itk::VectorImage< PixelType, 3 >::Pointer outputImage ;
+  outputImage = itk::VectorImage< PixelType , 3 >::New() ;
+  AddImage< PixelType >( outputImage , vectorOutputImage ) ;
+  vectorOutputImage.clear() ;
+
   //warper->SetInput( imageReader->GetOutput() );
   //warper->SetOutputSpacing( imageReader->GetOutput()->GetSpacing() );
   //warper->SetOutputOrigin( imageReader->GetOutput()->GetOrigin() );
   //warper->SetOutputDirection( imageReader->GetOutput()->GetDirection() );
 
   typename WriterType::Pointer  writer =  WriterType::New();
-  writer->SetFileName( WarpedImageName(list.resultsDirectory, list.inputVolume) );
-  writer->SetInput( vectorOutputImage[7] );
+  writer->SetFileName( WarpedImageName(args.resultsDirectory, args.inputVolume) );
+  writer->SetInput( outputImage );
   //writer->SetInput( imageReader->GetOutput() );
   writer->SetUseCompression( true );
   try
@@ -209,19 +213,19 @@ int Warp( parameters &list )
   }
 
   /* debug */
-  writer->SetInput( vectorOfImage[7] );
-  writer->SetFileName( "./component7.nrrd" );
-  writer->SetUseCompression( true );
-  try
-  {
-    writer->Update();
-  }
-  catch( itk::ExceptionObject& err )
-  {
-    std::cout << "Could not write 5th component" << std::endl;
-    std::cout << err << std::endl;
-    exit( EXIT_FAILURE );
-  }
+  //writer->SetInput( vectorOfImage[7] );
+  //writer->SetFileName( "./component7.nrrd" );
+  //writer->SetUseCompression( true );
+  //try
+  //{
+    //writer->Update();
+  //}
+  //catch( itk::ExceptionObject& err )
+  //{
+    //std::cout << "Could not write 5th component" << std::endl;
+    //std::cout << err << std::endl;
+    //exit( EXIT_FAILURE );
+  //}
 
 }
 
@@ -238,42 +242,42 @@ int main( int argc, char * argv[] )
   itk::ImageIOBase::IOComponentType componentType;
   GetImageType( inputVolume , pixelType , componentType );
 
-  parameters list;
-  list.resultsDirectory = resultsDirectory;
-  list.warp = warp;
-  list.inputVolume = inputVolume;
+  parameters args;
+  args.resultsDirectory = resultsDirectory;
+  args.warp = warp;
+  args.inputVolume = inputVolume;
 
   switch( componentType )
    {
       case itk::ImageIOBase::UCHAR:
-         return Warp< unsigned char >( list );
+         return Warp< unsigned char >( args );
          break;
       case itk::ImageIOBase::CHAR:
-         return Warp< char >( list );
+         return Warp< char >( args );
          break;
       case itk::ImageIOBase::USHORT:
-         return Warp< unsigned short >( list );
+         return Warp< unsigned short >( args );
          break;
       case itk::ImageIOBase::SHORT:
-         return Warp< short >( list );
+         return Warp< short >( args );
          break;
       case itk::ImageIOBase::UINT:
-         return Warp< unsigned int >( list );
+         return Warp< unsigned int >( args );
          break;
       case itk::ImageIOBase::INT:
-         return Warp< int >( list );
+         return Warp< int >( args );
          break;
       case itk::ImageIOBase::ULONG:
-         return Warp< unsigned long >( list );
+         return Warp< unsigned long >( args );
          break;
       case itk::ImageIOBase::LONG:
-         return Warp< long >( list );
+         return Warp< long >( args );
          break;
       case itk::ImageIOBase::FLOAT:
-         return Warp< float >( list );
+         return Warp< float >( args );
          break;
       case itk::ImageIOBase::DOUBLE:
-         return Warp< double >( list );
+         return Warp< double >( args );
          break;
       case itk::ImageIOBase::UNKNOWNCOMPONENTTYPE:
       default:
