@@ -627,6 +627,7 @@ void ComputeTemplateFromWarps( std::string outputDir, std::vector<std::string> f
   AdderType::Pointer               jacDetAdder = AdderType::New();
   WarperType::Pointer              warper = WarperType::New();
   ImageType::Pointer               image;
+  ImageType::Pointer               warped_image;
   ImageType::Pointer               imgSum =  ImageType::New();
   ImageType::Pointer               jacDetSum = ImageType::New();
   DeformationFieldType::Pointer    field = 0;
@@ -648,22 +649,18 @@ void ComputeTemplateFromWarps( std::string outputDir, std::vector<std::string> f
     fieldReader->SetFileName( DeformationName(outputDir, filenames[i], iter-1) );
     field = fieldReader->GetOutput();
 
-    //DeformationFieldType::SpacingType spacing;                                                                                                                                                                                   
-    //spacing.Fill( 1.0 );
-    //DeformationFieldType::PointType origin;
-    //origin.Fill( 0.0 );
-    //fieldReader->GetOutput()->SetSpacing( spacing );
-    //fieldReader->GetOutput()->SetOrigin( origin );
-    //DeformationFieldType::DirectionType direction;
-    //direction.SetIdentity();
-    //fieldReader->GetOutput()->SetDirection(direction);
-
     warper->SetDeformationField( fieldReader->GetOutput() );
     ConfigureWarper(warper, image);
-    
+    warper->Update();
+    warped_image = warper->GetOutput();
+    warped_image->DisconnectPipeline();
+
+    /* Write warped image */
+    warped_image->SetDirection(original_direction);
     writer->SetFileName( WarpedImageName(outputDir, filenames[i], iter-1) );
-    writer->SetInput( warper->GetOutput() );
+    writer->SetInput( warped_image );
     UpdateWriter(writer, "Could not write warped image to disk");
+    SetDirection(warped_image);
 
     //jacdetfilter->UpdateLargestPossibleRegion();
     jacdetfilter->SetInput( fieldReader->GetOutput() );
@@ -673,7 +670,7 @@ void ComputeTemplateFromWarps( std::string outputDir, std::vector<std::string> f
     jacDetSum = jacDetAdder->GetOutput();
 
     adder->SetInput1( imgSum );
-    adder->SetInput2( warper->GetOutput() );
+    adder->SetInput2( warped_image );
     adder->Update();
     imgSum = adder->GetOutput();
   }
