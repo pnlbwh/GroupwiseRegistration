@@ -1,6 +1,5 @@
 *.swp
 *.swo
-input/
 slicer3-6/
 *.nrrd
 *.nii.gz
