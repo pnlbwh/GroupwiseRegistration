@@ -1,6 +1,0 @@
-SET(cli_modules ${cli_modules} GroupWiseRegistration) #<--Add this line
-
-FOREACH(cli_module ${cli_modules})
-  ADD_SUBDIRECTORY(${cli_module})
-ENDFOREACH(cli_module)
-

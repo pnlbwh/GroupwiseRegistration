@@ -1,26 +1,34 @@
-project( WarpVolume )
+project( GroupWiseRegistration )
 
+cmake_minimum_required(VERSION 2.6)
 
-find_package(GenerateCLP REQUIRED)
-if(GenerateCLP_FOUND)
-  include(${GenerateCLP_USE_FILE})
-endif(GenerateCLP_FOUND)
+find_package(Slicer3 REQUIRED)
+include(${Slicer3_USE_FILE})
+
+#find_package(GenerateCLP REQUIRED)
+#if(GenerateCLP_FOUND)
+  #include(${GenerateCLP_USE_FILE})
+#endif(GenerateCLP_FOUND)
+#find_package(ITK REQUIRED)
+#include(${ITK_USE_FILE})
 
 link_directories(${ModuleDescriptionParser_BINARY_DIR})
-
-find_package(ITK REQUIRED)
-include(${ITK_USE_FILE})
-
 include_directories( ${SlicerBaseCLI_BINARY_DIR} ${SlicerBaseCLI_SOURCE_DIR} )
 
 #####################
 
-set (CLP WarpVolume )
+set (CLP GroupWiseRegistration )
 
-set ( ${CLP}_SOURCE ${CLP}.cxx)
-generateclp(${CLP}_SOURCE ${CLP}.xml ${Slicer3_SOURCE_DIR}/Resources/NAMICLogo.h)
+set (${CLP}_SOURCE ${CLP}.cxx)
+
+#if (Slicer3_SOURCE_DIR)
+  #generateclp(${CLP}_SOURCE ${CLP}.xml ${Slicer3_SOURCE_DIR}/Resources/NAMICLogo.h)
+#else
+generateclp(${CLP}_SOURCE ${CLP}.xml)
+#endif (Slicer3_SOURCE_DIR)
+
 add_executable(${CLP} ${${CLP}_SOURCE})
-slicer3_set_plugins_output_path(${CLP})
+#slicer3_set_plugins_output_path(${CLP})
 target_link_libraries (${CLP}
   ITKIO
   ITKCommon
@@ -29,20 +37,20 @@ target_link_libraries (${CLP}
 
 add_library(${CLP}Lib SHARED ${${CLP}_SOURCE})
 set_target_properties (${CLP}Lib PROPERTIES COMPILE_FLAGS "-Dmain=ModuleEntryPoint")
-slicer3_set_plugins_output_path(${CLP}Lib)
+#slicer3_set_plugins_output_path(${CLP}Lib)
 target_link_libraries (${CLP}Lib ITKIO ITKCommon ITKStatistics)
 
 
-if (Slicer3_SOURCE_DIR)
+#if (Slicer3_SOURCE_DIR)
   # install each target in the production area (where it would appear in an 
   # installation) and install each target in the developer area (for running 
   # from a build)
-  set(TARGETS        
-    WarpVolume
-    )
-  slicer3_install_plugins(${TARGETS})
+  #set(TARGETS        
+    #GroupWiseRegistration
+    #)
+  #slicer3_install_plugins(${TARGETS})
 
-endif (Slicer3_SOURCE_DIR)
+#endif (Slicer3_SOURCE_DIR)
 
 #the following line is an example of how to add a test to your project.
 #Testname is the title for this particular test.  ExecutableToRun is the
