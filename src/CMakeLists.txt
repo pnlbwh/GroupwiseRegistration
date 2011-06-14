@@ -5,6 +5,8 @@ cmake_minimum_required(VERSION 2.6)
 find_package(Slicer3 REQUIRED)
 include(${Slicer3_USE_FILE})
 
+slicer3_set_default_install_prefix_for_external_projects()
+
 #find_package(GenerateCLP REQUIRED)
 #if(GenerateCLP_FOUND)
   #include(${GenerateCLP_USE_FILE})
