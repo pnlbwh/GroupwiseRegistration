@@ -46,7 +46,7 @@
 #include "itkDiscreteGaussianImageFilter.h"
 #include "itkImageFileReader.h"
 #include "itkImageFileWriter.h"
-#include "GroupWiseRegistrationCLP.h"
+#include "GroupwiseRegistrationCLP.h"
 
 #include "itkExponentialDeformationFieldImageFilter.h"
 #include "itkESMInvConDemonsRegistrationFunction.h"

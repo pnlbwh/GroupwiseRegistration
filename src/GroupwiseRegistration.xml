@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <executable>
   <category>Registration</category>
+  <category>Diffusion.Create DWI Atlas</category>
   <title>Groupwise Log Domain Symmetric Registration</title>
   <description>
 </description>

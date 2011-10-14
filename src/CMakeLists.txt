@@ -1,4 +1,4 @@
-project( GroupWiseRegistration )
+project( GroupwiseRegistration )
 
 cmake_minimum_required(VERSION 2.6)
 
@@ -19,7 +19,7 @@ include_directories( ${SlicerBaseCLI_BINARY_DIR} ${SlicerBaseCLI_SOURCE_DIR} )
 
 #####################
 
-set (CLP GroupWiseRegistration )
+set (CLP GroupwiseRegistration )
 
 set (${CLP}_SOURCE ${CLP}.cxx)
 
