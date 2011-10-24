@@ -204,7 +204,9 @@ void
 MultiResolutionPDEDeformableRegistration2<TFixedImage,TMovingImage,TDeformationField,TRealType>
 ::GenerateData()
 {
+  #ifdef DEBUG
     std::cout << "In MultiResolutionPDEDeformableRegistration2::GenerateData" << std::endl;
+  #endif
 
   // Check for NULL images and pointers
   MovingImageConstPointer movingImage = this->GetMovingImage();
@@ -248,14 +250,18 @@ MultiResolutionPDEDeformableRegistration2<TFixedImage,TMovingImage,TDeformationF
 
   while ( !this->Halt() )
     {
+    #ifdef DEBUG
     std::cout << "In MultiResolutionPDEDeformableRegistration2::GenerateData: while (!this->Halt())" << std::endl;
+    #endif
 
     if( m_CurrentLevel == 0 )
       {
        // TODO: What to do if there is an input deformation field?
        // Will need a VectorMultiResolutionPyramidImageFilter to downsample it.
       m_RegistrationFilter->SetInitialDeformationField( NULL );
+      #ifdef DEBUG
         std::cout << "In MultiResolutionPDEDeformableRegistration2::GenerateData: while (!this->Halt()): m_CurrentLevel=0" << std::endl;
+      #endif
       }
     else
       {
@@ -269,11 +275,11 @@ MultiResolutionPDEDeformableRegistration2<TFixedImage,TMovingImage,TDeformationF
       m_FieldExpander->SetOutputOrigin( fi->GetOrigin() );
       m_FieldExpander->SetOutputSpacing( fi->GetSpacing());
 
-      std::cout << "---------------------" << std::endl;
+      std::cout << "-------------------------" << std::endl;
       std::cout << "m_FieldExpander size: " << m_FieldExpander->GetSize()[0] << std::endl;
       std::cout << "m_FieldExpander size: " << m_FieldExpander->GetSize()[1] << std::endl;
       std::cout << "m_FieldExpander size: " << m_FieldExpander->GetSize()[2] << std::endl;
-      std::cout << "---------------------" << std::endl;
+      std::cout << "-------------------------" << std::endl;
 
       m_FieldExpander->UpdateLargestPossibleRegion();
       m_FieldExpander->SetInput( NULL );

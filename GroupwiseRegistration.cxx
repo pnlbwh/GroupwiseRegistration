@@ -258,8 +258,8 @@ public:
       else if ( const MultiResRegistrationFilterType * multiresfilter = 
            dynamic_cast< const MultiResRegistrationFilterType * >( object ) )
       {
-         std::cout<<"Finished Multi-resolution iteration :"<<multiresfilter->GetCurrentLevel()-1<<std::endl;
-         std::cout<<"=============================="<<std::endl<<std::endl;
+         std::cout<<"Finished Multi-resolution iteration: "<<multiresfilter->GetCurrentLevel()-1<<std::endl;
+         std::cout<<"========================================"<<std::endl<<std::endl;
       }
       else
       {
@@ -564,7 +564,7 @@ void ComputeMean( std::vector<std::string> filenames, std::string filename)
     std::cout << filenames[i] << std::endl;
 
     GetImage(filenames[i], image);
-    std::cout << image->GetOrigin() << std::endl;
+    //std::cout << image->GetOrigin() << std::endl;
 
     if (i==0)
     {
@@ -847,7 +847,7 @@ std::vector<float> Range(float initial, float final, int num)
   {
     delta = 0.0;
   }
-  for (unsigned int i = 0; i < num; ++i)
+  for (int i = 0; i < num; ++i)
   {
     result[i] = initial - i * delta;
   }
@@ -902,7 +902,7 @@ void DoGroupWiseRegistration( arguments args )
 
       filter = ActualRegistrationFilterType::New();
       ConfigureRegistrationFilter(filter, sigma_diff[j], args.sigmaUp, args.regWeight);
-      std::cout << "sigma_diff[" << j << "] = " << sigma_diff[j] << std::endl;
+      std::cout << "sigma_diff[" << j << "] = " << sigma_diff[j] << std::endl << std::endl;
 
       MultiResRegistrationFilterType::Pointer multires = MultiResRegistrationFilterType::New();
       multires->SetRegistrationFilter( filter );

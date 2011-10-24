@@ -200,8 +200,9 @@ namespace itk {
     // setup gradient calculator
     m_FixedImageGradientCalculator->SetInputImage( this->GetFixedImage() );
     m_MappedMovingImageGradientCalculator->SetInputImage( this->GetMovingImage() );
-    
+    #ifdef DEBUG
     std::cout << "itkESMInvConDemonsRegistrationFunction:InitializeIteration: " << std::endl;
+    #endif
     // Compute warped moving image
     m_MovingImageWarper->SetOutputSpacing( this->GetFixedImage()->GetSpacing() );
     m_MovingImageWarper->SetOutputOrigin( this->GetFixedImage()->GetOrigin() );
@@ -242,7 +243,9 @@ namespace itk {
     m_NumberOfPixelsProcessed = 0L;
     m_SumOfSquaredChange      = 0.0;
 
+    #ifdef DEBUG
     std::cout << "In itkESMInvConDemonsRegistrationFunction:InitializeIteration: leaving" << std::endl;
+    #endif
 }
     
     

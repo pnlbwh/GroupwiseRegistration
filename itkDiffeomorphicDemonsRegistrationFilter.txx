@@ -67,7 +67,9 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
 ::InitializeIteration()
 {
 
+  #ifdef DEBUG
   std::cout << "DiffeomorphicDemonsRegistrationFilter:InitializeIteration(): " << std::endl;
+  #endif
 
   // update variables in the equation object
   DemonsRegistrationFunctionType *f = 
@@ -133,7 +135,9 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
   Superclass::InitializeIteration();
 
 
+  #ifdef DEBUG
   std::cout << "Finished InitializeIteration" << std::endl;
+  #endif
 }
 
 
@@ -317,7 +321,9 @@ void
 DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField>
 ::AllocateUpdateBuffer()
 {
-    std::cout << "In itkDiffeomorphicDemonsRegistrationFilter::AllocateUpdateBuffer" << std::endl;
+  #ifdef DEBUG
+  std::cout << "In itkDiffeomorphicDemonsRegistrationFilter::AllocateUpdateBuffer" << std::endl;
+  #endif 
   // The update buffer looks just like the output.
   DeformationFieldPointer output = this->GetOutput();
   DeformationFieldPointer upbuf = this->GetUpdateBuffer();
@@ -328,7 +334,9 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
   upbuf->SetSpacing(output->GetSpacing());
   upbuf->SetOrigin(output->GetOrigin());
   upbuf->Allocate();
-    std::cout << "Exiting itkDiffeomorphicDemonsRegistrationFilter::AllocateUpdateBuffer" << std::endl;
+  #ifdef DEBUG
+  std::cout << "Exiting itkDiffeomorphicDemonsRegistrationFilter::AllocateUpdateBuffer" << std::endl;
+  #endif 
 }
 
 
@@ -340,7 +348,9 @@ void
 DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField>
 ::ApplyUpdate(TimeStepType dt)
 {
+  #ifdef DEBUG
   std::cout << "Entering ApplyUpdate" << std::endl;
+  #endif 
    this->GetUpdateBuffer()->Modified();
    
   // If we smooth the update buffer before applying it, then the are
@@ -412,7 +422,9 @@ DiffeomorphicDemonsRegistrationFilter<TFixedImage,TMovingImage,TDeformationField
 
 
   /* Compose the vector fields to update the warp field */
-  std::cout << "itkDiffeomorphicDemonsRegistrationFilter::ApplyUpdate: Composing the vector fields" << this->GetUpdateBuffer()->GetLargestPossibleRegion().GetSize()[0] << std::endl;
+  #ifdef DEBUG
+  std::cout << "itkDiffeomorphicDemonsRegistrationFilter::ApplyUpdate: Composing the vector fields.  Size: " << this->GetUpdateBuffer()->GetLargestPossibleRegion().GetSize()[0] << std::endl;
+  #endif
   m_Exponentiator->SetInput( this->GetUpdateBuffer() );
   m_Warper->SetOutputSpacing( this->GetUpdateBuffer()->GetSpacing() );
   m_Warper->SetOutputOrigin( this->GetUpdateBuffer()->GetOrigin() );
